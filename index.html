@@ -206,6 +206,92 @@
         .building {
             animation: buildAnimation 0.8s ease-out;
         }
+        
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-content {
+            background: #1a1a2e;
+            padding: 30px;
+            border-radius: 15px;
+            border: 2px solid #4CAF50;
+            max-width: 400px;
+            text-align: center;
+            box-shadow: 0 0 30px rgba(76, 175, 80, 0.5);
+        }
+        
+        .modal-title {
+            font-size: 24px;
+            margin-bottom: 15px;
+            color: #4CAF50;
+        }
+        
+        .modal-text {
+            margin-bottom: 20px;
+            line-height: 1.4;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+        }
+        
+        .modal-button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .modal-button.primary {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .modal-button.primary:hover {
+            background: #81C784;
+        }
+        
+        .modal-button.secondary {
+            background: #333;
+            color: white;
+        }
+        
+        .modal-button.secondary:hover {
+            background: #555;
+        }
+        
+        .auto-mining-indicator {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 8px 15px;
+            border-radius: 6px;
+            border: 1px solid #4CAF50;
+            font-size: 14px;
+            color: #4CAF50;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 5px rgba(76, 175, 80, 0.3); }
+            50% { box-shadow: 0 0 15px rgba(76, 175, 80, 0.6); }
+        }
     </style>
 </head>
 <body>
@@ -250,10 +336,11 @@
     
     <div class="controls" id="miningControls">
         <div>🚀 WASD - Move Ship</div>
-        <div>🔫 Mouse - Aim & Mine</div>
+        <div>🤖 Auto-Mining: ON (Press X to toggle)</div>
         <div>⚡ Space - Scanner Pulse</div>
         <div>🏠 R - Return to Station</div>
         <div>📋 Tab - Station View</div>
+        <div style="opacity: 0.7; font-size: 12px;">Manual Mode: Mouse to aim & mine</div>
     </div>
     
     <div class="controls" id="stationControls" style="display: none;">
@@ -264,6 +351,21 @@
     </div>
     
     <div class="title" id="gameTitle">🌟 COSMIC COLLECTION STATION 🌟</div>
+    
+    <div class="auto-mining-indicator" id="autoMiningIndicator" style="display: none;">
+        🤖 AUTO-MINING
+    </div>
+    
+    <!-- Custom Modal Dialog -->
+    <div class="modal" id="gameModal">
+        <div class="modal-content">
+            <div class="modal-title" id="modalTitle">Title</div>
+            <div class="modal-text" id="modalText">Message text</div>
+            <div class="modal-buttons" id="modalButtons">
+                <!-- Buttons will be added dynamically -->
+            </div>
+        </div>
+    </div>
 
     <script>
         class CosmicCollectionStation {
@@ -315,6 +417,17 @@
                     speed: 8
                 };
                 
+                // Auto-mining system
+                this.autoMining = {
+                    enabled: true, // Default to enabled
+                    target: null,
+                    searchRadius: 180, // Increased range for better experience
+                    targetIndicator: { visible: false, x: 0, y: 0 }
+                };
+                
+                // Modal system
+                this.modalCallback = null;
+                
                 // Resources and progression
                 this.totalResources = this.loadTotalResources();
                 
@@ -332,13 +445,13 @@
                 
                 this.modules = {
                     command: { name: 'Command Pod', icon: '🏠', cost: 0, unlocked: true, built: true },
-                    storage: { name: 'Storage Bay', icon: '📦', cost: 10, unlocked: true, built: false },
-                    research: { name: 'Research Lab', icon: '🔬', cost: 15, unlocked: true, built: false },
-                    workshop: { name: 'Workshop', icon: '🔧', cost: 25, unlocked: false, built: false },
-                    greenhouse: { name: 'Greenhouse', icon: '🌱', cost: 35, unlocked: false, built: false },
-                    observatory: { name: 'Observatory', icon: '🔭', cost: 40, unlocked: false, built: false },
-                    quarters: { name: 'Guest Quarters', icon: '🛏️', cost: 50, unlocked: false, built: false },
-                    vault: { name: 'Master Vault', icon: '💎', cost: 100, unlocked: false, built: false }
+                    storage: { name: 'Storage Bay', icon: '📦', cost: 8, unlocked: true, built: false },
+                    research: { name: 'Research Lab', icon: '🔬', cost: 12, unlocked: true, built: false },
+                    workshop: { name: 'Workshop', icon: '🔧', cost: 20, unlocked: false, built: false },
+                    greenhouse: { name: 'Greenhouse', icon: '🌱', cost: 30, unlocked: false, built: false },
+                    observatory: { name: 'Observatory', icon: '🔭', cost: 35, unlocked: false, built: false },
+                    quarters: { name: 'Guest Quarters', icon: '🛏️', cost: 45, unlocked: false, built: false },
+                    vault: { name: 'Master Vault', icon: '💎', cost: 80, unlocked: false, built: false }
                 };
                 
                 this.expedition = {
@@ -362,6 +475,10 @@
                 // Hide title after animation
                 setTimeout(() => {
                     document.getElementById('gameTitle').style.display = 'none';
+                    // Show auto-mining indicator by default
+                    if (this.autoMining.enabled) {
+                        document.getElementById('autoMiningIndicator').style.display = 'block';
+                    }
                 }, 3000);
             }
             
@@ -453,13 +570,17 @@
                         e.preventDefault();
                         this.toggleView();
                     }
+                    
+                    if (e.key.toLowerCase() === 'x' && this.gameState === 'mining') {
+                        this.toggleAutoMining();
+                    }
                 });
                 
                 window.addEventListener('keyup', (e) => {
                     this.keys[e.key.toLowerCase()] = false;
                 });
                 
-                // Mouse for mining
+                // Mouse for mining (when auto-mining disabled)
                 this.canvas.addEventListener('mousemove', (e) => {
                     const rect = this.canvas.getBoundingClientRect();
                     this.mouse.x = e.clientX - rect.left;
@@ -467,7 +588,7 @@
                 });
                 
                 this.canvas.addEventListener('mousedown', (e) => {
-                    if (this.gameState === 'mining') {
+                    if (this.gameState === 'mining' && !this.autoMining.enabled) {
                         this.mouse.down = true;
                         this.startMining();
                     }
@@ -493,10 +614,12 @@
                     document.getElementById('stationControls').style.display = 'block';
                     document.getElementById('stationGrid').style.display = 'block';
                     document.getElementById('viewIndicator').textContent = '🏗️ Station Builder';
+                    document.getElementById('autoMiningIndicator').style.display = 'none';
                     this.updateStationDisplay();
                 } else {
                     // Starting a new expedition from station
-                    if (this.ship.fuel >= 20) {
+                    const launchCost = 8; // Reduced from 20, more accessible
+                    if (this.ship.fuel >= launchCost) {
                         this.expedition = {
                             currentField: 1,
                             maxFields: 5,
@@ -508,7 +631,7 @@
                         this.generateAsteroids();
                         this.ship.x = this.canvas.width / 2;
                         this.ship.y = this.canvas.height / 2;
-                        this.consumeFuel(10); // Launch cost
+                        this.consumeFuel(launchCost);
                         
                         document.getElementById('miningUI').style.display = 'block';
                         document.getElementById('miningControls').style.display = 'block';
@@ -516,8 +639,13 @@
                         document.getElementById('stationControls').style.display = 'none';
                         document.getElementById('stationGrid').style.display = 'none';
                         document.getElementById('viewIndicator').textContent = '🚀 Mining Expedition - Field 1/5';
+                        
+                        // Show auto-mining indicator
+                        if (this.autoMining.enabled) {
+                            document.getElementById('autoMiningIndicator').style.display = 'block';
+                        }
                     } else {
-                        alert('❌ Not enough fuel for expedition! Need at least 20 fuel to launch.');
+                        this.showAlert('Insufficient Fuel', `❌ Not enough fuel for expedition!\nNeed ${launchCost} fuel to launch.`);
                     }
                 }
             }
@@ -714,23 +842,29 @@
                 if (!this.modules) return;
                 
                 // Reset to base values first
-                this.ship.maxCargo = 6; // Base starting capacity
-                this.laser.power = 1; // Base power
-                this.ship.maxFuel = 100; // Base fuel
+                this.ship.maxCargo = 4; // Reduced base capacity
+                this.laser.power = 1.5; // Increased base power  
+                this.ship.maxFuel = 80; // Reduced base fuel
                 
-                // Storage Bay increases cargo capacity
+                // Storage Bay increases cargo capacity significantly
                 if (this.modules.storage && this.modules.storage.built) {
-                    this.ship.maxCargo = 10; // Significant upgrade
+                    this.ship.maxCargo = 8; // Doubled capacity upgrade
                 }
                 
-                // Workshop increases mining power
+                // Workshop increases mining power substantially
                 if (this.modules.workshop && this.modules.workshop.built) {
-                    this.laser.power = 1.8; // Better upgrade
+                    this.laser.power = 3.5; // Much more impactful upgrade
                 }
                 
-                // Greenhouse provides fuel efficiency
+                // Greenhouse provides fuel efficiency AND capacity
                 if (this.modules.greenhouse && this.modules.greenhouse.built) {
-                    this.ship.maxFuel = 180; // Bigger upgrade
+                    this.ship.maxFuel = 150; // More meaningful fuel upgrade
+                }
+                
+                // Observatory adds scanner efficiency (new bonus)
+                if (this.modules.observatory && this.modules.observatory.built) {
+                    this.scanner.speed = 12; // Faster scanner
+                    this.scanner.maxRadius = 300; // Larger range
                 }
             }
             
@@ -779,24 +913,28 @@
                 this.artifacts = []; // Clear current field artifacts
                 
                 const fieldDifficulty = this.expedition.currentField;
-                const baseCount = 8 + fieldDifficulty * 2;
-                const rareChance = 0.1 + fieldDifficulty * 0.05; // Deeper = more rare materials
+                const baseCount = 6 + fieldDifficulty * 1; // Reduced: 7-11 asteroids instead of 10-18
+                const rareChance = 0.15 + fieldDifficulty * 0.08; // Better rare chances: 15%-55%
                 
                 for (let i = 0; i < baseCount; i++) {
+                    const size = 15 + Math.random() * 20;
+                    const isRare = Math.random() < rareChance;
+                    
                     this.asteroids.push({
                         x: Math.random() * this.canvas.width,
                         y: Math.random() * this.canvas.height,
-                        size: 15 + Math.random() * 25,
-                        health: 60 + fieldDifficulty * 20,
-                        maxHealth: 60 + fieldDifficulty * 20,
-                        type: Math.random() < rareChance ? 'rare' : 'common',
+                        size: size,
+                        health: 20 + fieldDifficulty * 8, // Reduced: 20-60 health (was 60-160)
+                        maxHealth: 20 + fieldDifficulty * 8,
+                        type: isRare ? 'rare' : 'common',
                         rotation: 0,
-                        rotationSpeed: (Math.random() - 0.5) * 0.05
+                        rotationSpeed: (Math.random() - 0.5) * 0.05,
+                        resources: isRare ? 3 + fieldDifficulty : 1 + Math.floor(fieldDifficulty / 2) // Dynamic resource yield
                     });
                 }
                 
-                // Generate artifacts based on field depth
-                const artifactChance = 0.3 + fieldDifficulty * 0.15;
+                // Artifacts more common in later fields (25%-85% chance)
+                const artifactChance = 0.25 + fieldDifficulty * 0.15;
                 if (Math.random() < artifactChance) {
                     this.spawnArtifact();
                 }
@@ -851,26 +989,85 @@
             updateShip() {
                 if (this.gameState !== 'mining') return;
                 
-                // Ship movement
+                // Auto-mining: find nearest asteroid
+                if (this.autoMining.enabled) {
+                    let nearestAsteroid = null;
+                    let nearestDistance = this.autoMining.searchRadius;
+                    
+                    this.asteroids.forEach(asteroid => {
+                        const distance = Math.sqrt(
+                            (asteroid.x - this.ship.x) ** 2 + 
+                            (asteroid.y - this.ship.y) ** 2
+                        );
+                        
+                        if (distance < nearestDistance) {
+                            nearestDistance = distance;
+                            nearestAsteroid = asteroid;
+                        }
+                    });
+                    
+                    this.autoMining.target = nearestAsteroid;
+                    
+                    // Update target indicator
+                    if (nearestAsteroid) {
+                        this.autoMining.targetIndicator.visible = true;
+                        this.autoMining.targetIndicator.x = nearestAsteroid.x;
+                        this.autoMining.targetIndicator.y = nearestAsteroid.y;
+                        
+                        // Auto-rotate toward target with smooth interpolation
+                        const targetAngle = Math.atan2(
+                            nearestAsteroid.y - this.ship.y, 
+                            nearestAsteroid.x - this.ship.x
+                        );
+                        
+                        // Smooth rotation
+                        let angleDiff = targetAngle - this.ship.angle;
+                        while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+                        while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+                        this.ship.angle += angleDiff * 0.1; // Smooth rotation
+                        
+                        // Auto-mine if in range with improved range
+                        const miningRange = 140; // Increased mining range
+                        if (nearestDistance < miningRange && this.ship.fuel > 0) {
+                            this.laser.active = true;
+                            this.laser.x = this.ship.x;
+                            this.laser.y = this.ship.y;
+                            this.laser.targetX = nearestAsteroid.x;
+                            this.laser.targetY = nearestAsteroid.y;
+                        } else {
+                            this.laser.active = false;
+                        }
+                    } else {
+                        this.laser.active = false;
+                        this.autoMining.targetIndicator.visible = false;
+                    }
+                } else {
+                    // Manual mode: update ship angle to point towards mouse
+                    this.ship.angle = Math.atan2(this.mouse.y - this.ship.y, this.mouse.x - this.ship.x);
+                    this.autoMining.targetIndicator.visible = false;
+                }
+                
+                // Ship movement (same for both modes)
                 const acceleration = 0.3;
                 const friction = 0.95;
                 const maxSpeed = 4;
                 
+                // Reduced fuel consumption for movement (more exploration-friendly)
                 if (this.keys['w'] || this.keys['arrowup']) {
                     this.ship.vy -= acceleration;
-                    this.consumeFuel(0.1);
+                    this.consumeFuel(0.05);
                 }
                 if (this.keys['s'] || this.keys['arrowdown']) {
                     this.ship.vy += acceleration;
-                    this.consumeFuel(0.1);
+                    this.consumeFuel(0.05);
                 }
                 if (this.keys['a'] || this.keys['arrowleft']) {
                     this.ship.vx -= acceleration;
-                    this.consumeFuel(0.1);
+                    this.consumeFuel(0.05);
                 }
                 if (this.keys['d'] || this.keys['arrowright']) {
                     this.ship.vx += acceleration;
-                    this.consumeFuel(0.1);
+                    this.consumeFuel(0.05);
                 }
                 
                 // Apply friction
@@ -893,9 +1090,6 @@
                 if (this.ship.x > this.canvas.width) this.ship.x = 0;
                 if (this.ship.y < 0) this.ship.y = this.canvas.height;
                 if (this.ship.y > this.canvas.height) this.ship.y = 0;
-                
-                // Update ship angle to point towards mouse
-                this.ship.angle = Math.atan2(this.mouse.y - this.ship.y, this.mouse.x - this.ship.x);
             }
             
             startMining() {
@@ -915,7 +1109,7 @@
             updateMining() {
                 if (!this.laser.active || this.gameState !== 'mining') return;
                 
-                this.consumeFuel(0.3);
+                this.consumeFuel(0.2);
                 
                 // Check laser collision with asteroids
                 this.asteroids.forEach((asteroid, index) => {
@@ -943,13 +1137,18 @@
                     
                     if (this.expedition.currentField < this.expedition.maxFields) {
                         // Show field cleared message and options
-                        setTimeout(() => {
-                            const shouldContinue = confirm(`Field ${this.expedition.currentField} cleared! 🌟\n\nContinue to Field ${this.expedition.currentField + 1} for rarer materials?\n\nOK = Continue Deeper\nCancel = Return to Station`);
+                        setTimeout(async () => {
+                            const travelCost = 5 + this.expedition.currentField * 2; // Escalating cost: 7, 9, 11, 13
+                            const fuelRemaining = this.ship.fuel - travelCost;
                             
-                            if (shouldContinue && this.ship.fuel > 20) {
+                            const message = `Field ${this.expedition.currentField} cleared! 🌟\n\nContinue to Field ${this.expedition.currentField + 1}?\n\nTravel Cost: ${travelCost} fuel\nFuel Remaining: ${fuelRemaining}\n\nDeeper fields have rarer materials & artifacts!`;
+                            
+                            const shouldContinue = await this.showConfirm('Field Complete!', message);
+                            
+                            if (shouldContinue && this.ship.fuel >= travelCost) {
                                 this.expedition.currentField++;
                                 this.generateAsteroids();
-                                this.consumeFuel(10); // Cost to travel deeper
+                                this.consumeFuel(travelCost);
                             } else {
                                 this.expedition.returnToStation = true;
                                 this.dockAtStation();
@@ -957,8 +1156,8 @@
                         }, 1000);
                     } else {
                         // Reached max depth
-                        setTimeout(() => {
-                            alert(`🏆 Expedition Complete! You've reached the deepest field!\nReturning to station with your treasures.`);
+                        setTimeout(async () => {
+                            await this.showAlert('Expedition Complete!', '🏆 You\'ve reached the deepest field!\nReturning to station with your treasures.');
                             this.expedition.returnToStation = true;
                             this.dockAtStation();
                         }, 1000);
@@ -1028,7 +1227,7 @@
                         resource.y += dy * 0.2;
                         
                         if (distance < 15 && this.ship.cargo.length < this.ship.maxCargo) {
-                            this.ship.cargo.push(resource.type);
+                            this.ship.cargo.push(resource);
                             this.resources.splice(index, 1);
                         }
                     }
@@ -1065,13 +1264,28 @@
                 });
             }
             
+            createParticles(x, y, color, count) {
+                for (let i = 0; i < count; i++) {
+                    this.particles.push({
+                        x: x + (Math.random() - 0.5) * 20,
+                        y: y + (Math.random() - 0.5) * 20,
+                        vx: (Math.random() - 0.5) * 6,
+                        vy: (Math.random() - 0.5) * 6,
+                        life: 0.8,
+                        decay: 0.02,
+                        size: 2 + Math.random() * 3,
+                        color: color
+                    });
+                }
+            }
+            
             activateScanner() {
                 if (this.scanner.active) return;
                 
                 this.scanner.active = true;
                 this.scanner.radius = 0;
                 this.scanner.pulseTime = 1;
-                this.consumeFuel(5);
+                this.consumeFuel(3); // Reduced from 5 - scanner should be more accessible
             }
             
             updateScanner() {
@@ -1096,8 +1310,8 @@
                                 this.createParticles(artifact.x, artifact.y, '#FFD700', 10);
                                 
                                 // Show discovery message
-                                setTimeout(() => {
-                                    alert(`🎉 Artifact Discovered!\n\n${artifact.icon} ${artifact.name}\nRarity: ${artifact.rarity.toUpperCase()}\nValue: ${artifact.value} research points`);
+                                setTimeout(async () => {
+                                    await this.showAlert('Artifact Discovered!', `🎉 ${artifact.icon} ${artifact.name}\nRarity: ${artifact.rarity.toUpperCase()}\nValue: ${artifact.value} research points`);
                                 }, 100);
                             }
                         }
@@ -1301,6 +1515,46 @@
                     this.ctx.stroke();
                 }
                 
+                // Draw auto-mining target indicator
+                if (this.autoMining.enabled && this.autoMining.targetIndicator.visible) {
+                    const time = Date.now() * 0.005;
+                    const pulse = Math.sin(time) * 0.3 + 0.7;
+                    
+                    this.ctx.strokeStyle = `rgba(76, 175, 80, ${pulse})`;
+                    this.ctx.lineWidth = 2;
+                    this.ctx.setLineDash([5, 5]);
+                    this.ctx.beginPath();
+                    this.ctx.arc(this.autoMining.targetIndicator.x, this.autoMining.targetIndicator.y, 30, 0, Math.PI * 2);
+                    this.ctx.stroke();
+                    this.ctx.setLineDash([]); // Reset line dash
+                    
+                    // Target crosshair
+                    this.ctx.strokeStyle = `rgba(76, 175, 80, ${pulse * 0.8})`;
+                    this.ctx.lineWidth = 1;
+                    const x = this.autoMining.targetIndicator.x;
+                    const y = this.autoMining.targetIndicator.y;
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(x - 10, y);
+                    this.ctx.lineTo(x + 10, y);
+                    this.ctx.moveTo(x, y - 10);
+                    this.ctx.lineTo(x, y + 10);
+                    this.ctx.stroke();
+                }
+                
+                // Draw auto-mining search range when no targets (subtle feedback)
+                if (this.autoMining.enabled && !this.autoMining.targetIndicator.visible && this.asteroids.length > 0) {
+                    const time = Date.now() * 0.002;
+                    const pulse = Math.sin(time) * 0.1 + 0.15;
+                    
+                    this.ctx.strokeStyle = `rgba(76, 175, 80, ${pulse})`;
+                    this.ctx.lineWidth = 1;
+                    this.ctx.setLineDash([2, 8]);
+                    this.ctx.beginPath();
+                    this.ctx.arc(this.ship.x, this.ship.y, this.autoMining.searchRadius, 0, Math.PI * 2);
+                    this.ctx.stroke();
+                    this.ctx.setLineDash([]); // Reset line dash
+                }
+                
                 // Draw ship
                 this.ctx.save();
                 this.ctx.translate(this.ship.x, this.ship.y);
@@ -1398,7 +1652,18 @@
                 
                 if (document.getElementById('fuelFill')) {
                     document.getElementById('fuelFill').style.width = fuelPercentage + '%';
+                    
+                    // Fuel warning colors
+                    const fuelFill = document.getElementById('fuelFill');
+                    if (fuelPercentage < 20) {
+                        fuelFill.style.background = 'linear-gradient(90deg, #f44336, #ff5722)'; // Red warning
+                    } else if (fuelPercentage < 40) {
+                        fuelFill.style.background = 'linear-gradient(90deg, #ff9800, #ffc107)'; // Orange caution
+                    } else {
+                        fuelFill.style.background = 'linear-gradient(90deg, #4CAF50, #81C784)'; // Green normal
+                    }
                 }
+                
                 if (document.getElementById('cargoFill')) {
                     document.getElementById('cargoFill').style.width = cargoPercentage + '%';
                 }
@@ -1415,8 +1680,21 @@
                 // Update expedition progress in view indicator
                 if (this.gameState === 'mining' && document.getElementById('viewIndicator')) {
                     const remaining = this.asteroids.length;
+                    const fuelWarning = this.ship.fuel < 15 ? ' ⚠️ LOW FUEL' : '';
                     document.getElementById('viewIndicator').textContent = 
-                        `🚀 Expedition - Field ${this.expedition.currentField}/${this.expedition.maxFields} (${remaining} asteroids remaining)`;
+                        `🚀 Expedition - Field ${this.expedition.currentField}/${this.expedition.maxFields} (${remaining} asteroids remaining)${fuelWarning}`;
+                }
+                
+                // Emergency fuel warning
+                if (this.gameState === 'mining' && this.ship.fuel <= 10 && !this.fuelWarningShown) {
+                    this.fuelWarningShown = true;
+                    setTimeout(async () => {
+                        const shouldReturn = await this.showConfirm('FUEL CRITICAL!', '⚠️ Return to station immediately?\n\nContinuing may strand you in space!');
+                        if (shouldReturn) {
+                            this.returnToStation();
+                        }
+                        this.fuelWarningShown = false; // Reset warning
+                    }, 100);
                 }
             }
             
@@ -1435,8 +1713,17 @@
             }
             
             dockAtStation() {
-                // Transfer cargo to station storage
-                this.totalResources += this.ship.cargo.length;
+                // Transfer cargo to station storage with proper value calculation
+                let resourceValue = 0;
+                this.ship.cargo.forEach(resource => {
+                    if (resource.type === 'rare') {
+                        resourceValue += 4; // Rare resources worth more
+                    } else {
+                        resourceValue += 1; // Common resources base value
+                    }
+                });
+                
+                this.totalResources += resourceValue;
                 this.ship.cargo = [];
                 
                 // Auto-refuel at station
@@ -1449,7 +1736,8 @@
                 document.getElementById('stationUI').style.display = 'block';
                 document.getElementById('stationControls').style.display = 'block';
                 document.getElementById('stationGrid').style.display = 'block';
-                document.getElementById('viewIndicator').textContent = '🏗️ Station Builder - Refueled & Ready!';
+                document.getElementById('autoMiningIndicator').style.display = 'none';
+                document.getElementById('viewIndicator').textContent = `🏗️ Station Builder - Refueled! (+${resourceValue} resources)`;
                 this.updateStationDisplay();
                 
                 // Generate new field for next expedition
@@ -1460,6 +1748,71 @@
                     localStorage.setItem('totalResources', this.totalResources.toString());
                 } catch (e) {
                     console.warn('Failed to save resources:', e);
+                }
+            }
+            
+            // Modal dialog system
+            showModal(title, message, buttons) {
+                return new Promise((resolve) => {
+                    document.getElementById('modalTitle').textContent = title;
+                    document.getElementById('modalText').textContent = message;
+                    
+                    const buttonContainer = document.getElementById('modalButtons');
+                    buttonContainer.innerHTML = '';
+                    
+                    buttons.forEach(button => {
+                        const btn = document.createElement('button');
+                        btn.className = `modal-button ${button.class || 'secondary'}`;
+                        btn.textContent = button.text;
+                        btn.onclick = () => {
+                            this.hideModal();
+                            resolve(button.value);
+                        };
+                        buttonContainer.appendChild(btn);
+                    });
+                    
+                    document.getElementById('gameModal').style.display = 'flex';
+                });
+            }
+            
+            hideModal() {
+                document.getElementById('gameModal').style.display = 'none';
+            }
+            
+            showAlert(title, message) {
+                return this.showModal(title, message, [
+                    { text: 'OK', class: 'primary', value: true }
+                ]);
+            }
+            
+            showConfirm(title, message) {
+                return this.showModal(title, message, [
+                    { text: 'Yes', class: 'primary', value: true },
+                    { text: 'No', class: 'secondary', value: false }
+                ]);
+            }
+            
+            toggleAutoMining() {
+                this.autoMining.enabled = !this.autoMining.enabled;
+                this.autoMining.target = null;
+                this.autoMining.targetIndicator.visible = false;
+                
+                const indicator = document.getElementById('autoMiningIndicator');
+                const controlsText = document.querySelector('#miningControls div:nth-child(2)');
+                
+                if (this.autoMining.enabled) {
+                    indicator.style.display = 'block';
+                    if (controlsText) {
+                        controlsText.innerHTML = '🤖 Auto-Mining: ON (Press X to toggle)';
+                        controlsText.style.color = '#4CAF50';
+                    }
+                } else {
+                    indicator.style.display = 'none';
+                    if (controlsText) {
+                        controlsText.innerHTML = '🔫 Manual Mode: ON (Press X to toggle)';
+                        controlsText.style.color = '#ff9800';
+                    }
+                    this.stopMining();
                 }
             }
         }
