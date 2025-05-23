@@ -7,10 +7,17 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <!-- Game Canvas (Background Layer) -->
     <canvas id="gameCanvas"></canvas>
     
-    <!-- View Indicator -->
+    <!-- Title Screen (Intro Layer) -->
+    <div class="title" id="gameTitle">🌟 COSMIC COLLECTION STATION 🌟</div>
+    
+    <!-- UI Indicators (Top Layer) -->
     <div class="view-indicator" id="viewIndicator">🚀 Mining Expedition</div>
+    <div class="auto-mining-indicator" id="autoMiningIndicator" style="display: none;">
+        🤖 AUTO-MINING ACTIVE
+    </div>
     
     <!-- Mining UI (Left Panel) -->
     <div class="ui" id="miningUI">
@@ -121,12 +128,12 @@
         </div>
     </div>
     
-    <!-- Station Grid (Center) -->
+    <!-- Station Grid (Overlay Center) -->
     <div class="station-grid" id="stationGrid">
         <!-- Grid will be populated by JavaScript -->
     </div>
     
-    <!-- Mining Controls (Bottom Right) -->
+    <!-- Control Panels (Bottom Layer) -->
     <div class="controls" id="miningControls">
         <h4>🎮 Controls</h4>
         <div class="control-item">
@@ -154,7 +161,6 @@
         </div>
     </div>
     
-    <!-- Station Controls (Bottom Right) -->
     <div class="controls" id="stationControls" style="display: none;">
         <h4>🏗️ Station Controls</h4>
         <div class="control-item">
@@ -174,15 +180,7 @@
         </div>
     </div>
     
-    <!-- Title -->
-    <div class="title" id="gameTitle">🌟 COSMIC COLLECTION STATION 🌟</div>
-    
-    <!-- Auto-Mining Indicator -->
-    <div class="auto-mining-indicator" id="autoMiningIndicator" style="display: none;">
-        🤖 AUTO-MINING ACTIVE
-    </div>
-    
-    <!-- Enhanced Modal Dialog -->
+    <!-- Modal Dialog System (Top Layer) -->
     <div class="modal" id="gameModal">
         <div class="modal-content">
             <div class="modal-title" id="modalTitle">Title</div>

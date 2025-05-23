@@ -124,10 +124,9 @@ class UIManager {
         
         container.appendChild(element);
         
-        // Animate in
+        // Animate in with enhanced animation
         requestAnimationFrame(() => {
-            element.style.transform = 'translateX(0)';
-            element.style.opacity = '1';
+            element.classList.add('show');
         });
     }
 
@@ -145,14 +144,14 @@ class UIManager {
     removeNotification(id) {
         const element = document.getElementById(`notification-${id}`);
         if (element) {
-            element.style.transform = 'translateX(100%)';
-            element.style.opacity = '0';
+            element.classList.remove('show');
+            element.classList.add('hide');
             
             setTimeout(() => {
                 if (element.parentNode) {
                     element.parentNode.removeChild(element);
                 }
-            }, 300);
+            }, 400); // Match CSS animation duration
         }
         
         this.notifications = this.notifications.filter(n => n.id !== id);
@@ -293,6 +292,12 @@ class UIManager {
         document.getElementById('stationGrid').style.display = 'none';
         document.getElementById('viewIndicator').textContent = '🚀 Mining Expedition - Field 1/5';
         document.getElementById('autoMiningIndicator').style.display = 'none';
+        
+        // Add smooth transition
+        setTimeout(() => {
+            document.getElementById('miningUI').style.opacity = '1';
+            document.getElementById('miningControls').style.opacity = '1';
+        }, 50);
     }
 
     switchToStationUI() {
@@ -303,6 +308,12 @@ class UIManager {
         document.getElementById('stationGrid').style.display = 'block';
         document.getElementById('viewIndicator').textContent = '🏗️ Station Builder';
         document.getElementById('autoMiningIndicator').style.display = 'none';
+        
+        // Add smooth transition
+        setTimeout(() => {
+            document.getElementById('stationUI').style.opacity = '1';
+            document.getElementById('stationControls').style.opacity = '1';
+        }, 50);
     }
 
     // Enhanced artifact discovery feedback
