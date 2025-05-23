@@ -4,9 +4,14 @@ class CosmicCollectionStation {
         this.ctx = this.canvas.getContext('2d');
         this.setupCanvas();
         
-        // Initialize modules
+        // Initialize all modules
         this.renderer = new Renderer(this.canvas, this.ctx);
         this.stationManager = new StationManager();
+        this.resourceManager = new ResourceManager();
+        this.ui = new UIManager();
+        
+        // Make UI globally accessible for notifications
+        window.game = this;
         
         // Game state
         this.gameState = 'mining'; // 'mining' or 'station'
@@ -59,9 +64,6 @@ class CosmicCollectionStation {
             targetIndicator: { visible: false, x: 0, y: 0 }
         };
         
-        // Modal system
-        this.modalCallback = null;
-        
         // Resources and progression
         this.totalResources = this.loadTotalResources();
         
@@ -88,7 +90,7 @@ class CosmicCollectionStation {
         };
         
         this.artifacts = []; // Discovered artifacts in current field
-        this.discoveredArtifacts = this.loadDiscoveredArtifacts(); // Global collection
+        this.discoveredArtifacts = this.resourceManager.loadDiscoveredArtifacts(); // Global collection
         
         this.generateAsteroids();
         this.setupEventListeners();
@@ -98,14 +100,8 @@ class CosmicCollectionStation {
         this.stationManager.updateStationDisplay(this.totalResources, this.station);
         this.gameLoop();
         
-        // Hide title after animation
-        setTimeout(() => {
-            document.getElementById('gameTitle').style.display = 'none';
-            // Show auto-mining indicator by default
-            if (this.autoMining.enabled) {
-                document.getElementById('autoMiningIndicator').style.display = 'block';
-            }
-        }, 3000);
+        // Initialize title sequence with enhanced UI
+        this.ui.initializeTitleSequence(this.autoMining.enabled);
     }
     
     setupCanvas() {
@@ -182,13 +178,7 @@ class CosmicCollectionStation {
     toggleView() {
         if (this.gameState === 'mining') {
             this.gameState = 'station';
-            document.getElementById('miningUI').style.display = 'none';
-            document.getElementById('miningControls').style.display = 'none';
-            document.getElementById('stationUI').style.display = 'block';
-            document.getElementById('stationControls').style.display = 'block';
-            document.getElementById('stationGrid').style.display = 'block';
-            document.getElementById('viewIndicator').textContent = '🏗️ Station Builder';
-            document.getElementById('autoMiningIndicator').style.display = 'none';
+            this.ui.switchToStationUI();
             this.stationManager.updateStationDisplay(this.totalResources, this.station);
         } else {
             // Starting a new expedition from station
@@ -207,19 +197,14 @@ class CosmicCollectionStation {
                 this.ship.y = this.canvas.height / 2;
                 this.consumeFuel(launchCost);
                 
-                document.getElementById('miningUI').style.display = 'block';
-                document.getElementById('miningControls').style.display = 'block';
-                document.getElementById('stationUI').style.display = 'none';
-                document.getElementById('stationControls').style.display = 'none';
-                document.getElementById('stationGrid').style.display = 'none';
-                document.getElementById('viewIndicator').textContent = '🚀 Mining Expedition - Field 1/5';
+                this.ui.switchToMiningUI();
                 
                 // Show auto-mining indicator
                 if (this.autoMining.enabled) {
                     document.getElementById('autoMiningIndicator').style.display = 'block';
                 }
             } else {
-                this.showAlert('Insufficient Fuel', `❌ Not enough fuel for expedition!\nNeed ${launchCost} fuel to launch.`);
+                this.ui.showInsufficientFuel(launchCost);
             }
         }
     }
@@ -230,81 +215,30 @@ class CosmicCollectionStation {
     }
     
     generateAsteroids() {
-        this.asteroids = [];
+        this.asteroids = this.resourceManager.generateFieldAsteroids(
+            this.expedition.currentField, 
+            this.canvas.width, 
+            this.canvas.height
+        );
         this.artifacts = []; // Clear current field artifacts
         
-        const fieldDifficulty = this.expedition.currentField;
-        const baseCount = 6 + fieldDifficulty * 1; // Reduced: 7-11 asteroids instead of 10-18
-        const rareChance = 0.15 + fieldDifficulty * 0.08; // Better rare chances: 15%-55%
-        
-        for (let i = 0; i < baseCount; i++) {
-            const size = 15 + Math.random() * 20;
-            const isRare = Math.random() < rareChance;
-            
-            this.asteroids.push({
-                x: Math.random() * this.canvas.width,
-                y: Math.random() * this.canvas.height,
-                size: size,
-                health: 20 + fieldDifficulty * 8, // Reduced: 20-60 health (was 60-160)
-                maxHealth: 20 + fieldDifficulty * 8,
-                type: isRare ? 'rare' : 'common',
-                rotation: 0,
-                rotationSpeed: (Math.random() - 0.5) * 0.05,
-                resources: isRare ? 3 + fieldDifficulty : 1 + Math.floor(fieldDifficulty / 2) // Dynamic resource yield
-            });
-        }
-        
-        // Artifacts more common in later fields (25%-85% chance)
-        const artifactChance = 0.25 + fieldDifficulty * 0.15;
-        if (Math.random() < artifactChance) {
+        // Generate artifacts using ResourceManager
+        if (this.resourceManager.shouldSpawnArtifact(this.expedition.currentField)) {
             this.spawnArtifact();
         }
     }
     
     spawnArtifact() {
-        const artifactTypes = [
-            { name: 'Ancient Data Core', icon: '💿', rarity: 'common', value: 5 },
-            { name: 'Alien Crystal Fragment', icon: '💎', rarity: 'uncommon', value: 10 },
-            { name: 'Quantum Resonator', icon: '⚡', rarity: 'rare', value: 20 },
-            { name: 'Stellar Memory Bank', icon: '🧠', rarity: 'epic', value: 50 },
-            { name: 'Master Artifact Shard', icon: '🌟', rarity: 'legendary', value: 100 }
-        ];
-        
-        // Higher field = better artifacts
-        const fieldBonus = this.expedition.currentField;
-        let availableTypes = artifactTypes.filter(type => {
-            if (type.rarity === 'legendary') return fieldBonus >= 4;
-            if (type.rarity === 'epic') return fieldBonus >= 3;
-            if (type.rarity === 'rare') return fieldBonus >= 2;
-            return true; // common and uncommon always available
-        });
-        
-        const artifact = availableTypes[Math.floor(Math.random() * availableTypes.length)];
-        this.artifacts.push({
-            x: Math.random() * this.canvas.width,
-            y: Math.random() * this.canvas.height,
-            ...artifact,
-            discovered: false,
-            pulsePhase: Math.random() * Math.PI * 2
-        });
+        const artifact = this.resourceManager.generateArtifact(this.expedition.currentField);
+        this.artifacts.push(artifact);
     }
     
     loadDiscoveredArtifacts() {
-        try {
-            const saved = localStorage.getItem('discoveredArtifacts');
-            return saved ? JSON.parse(saved) : [];
-        } catch (e) {
-            console.warn('Failed to load artifacts:', e);
-            return [];
-        }
+        return this.resourceManager.loadDiscoveredArtifacts();
     }
     
     saveDiscoveredArtifacts() {
-        try {
-            localStorage.setItem('discoveredArtifacts', JSON.stringify(this.discoveredArtifacts));
-        } catch (e) {
-            console.warn('Failed to save artifacts:', e);
-        }
+        this.resourceManager.saveDiscoveredArtifacts(this.discoveredArtifacts);
     }
     
     updateShip() {
@@ -457,28 +391,32 @@ class CosmicCollectionStation {
             this.expedition.fieldsCleared++;
             
             if (this.expedition.currentField < this.expedition.maxFields) {
-                // Show field cleared message and options
+                // Show field cleared message using UIManager
                 setTimeout(async () => {
                     const travelCost = 5 + this.expedition.currentField * 2; // Escalating cost: 7, 9, 11, 13
                     const fuelRemaining = this.ship.fuel - travelCost;
                     
-                    const message = `Field ${this.expedition.currentField} cleared! 🌟\n\nContinue to Field ${this.expedition.currentField + 1}?\n\nTravel Cost: ${travelCost} fuel\nFuel Remaining: ${fuelRemaining}\n\nDeeper fields have rarer materials & artifacts!`;
-                    
-                    const shouldContinue = await this.showConfirm('Field Complete!', message);
+                    const shouldContinue = await this.ui.showFieldComplete(
+                        this.expedition.currentField, 
+                        this.expedition.maxFields, 
+                        travelCost, 
+                        fuelRemaining
+                    );
                     
                     if (shouldContinue && this.ship.fuel >= travelCost) {
                         this.expedition.currentField++;
                         this.generateAsteroids();
                         this.consumeFuel(travelCost);
+                        this.ui.showNotification(`🚀 Entering Field ${this.expedition.currentField}`, 'info', 3000);
                     } else {
                         this.expedition.returnToStation = true;
                         this.dockAtStation();
                     }
                 }, 1000);
             } else {
-                // Reached max depth
+                // Reached max depth using UIManager
                 setTimeout(async () => {
-                    await this.showAlert('Expedition Complete!', '🏆 You\'ve reached the deepest field!\nReturning to station with your treasures.');
+                    await this.ui.showExpeditionComplete();
                     this.expedition.returnToStation = true;
                     this.dockAtStation();
                 }, 1000);
@@ -501,19 +439,9 @@ class CosmicCollectionStation {
             });
         }
         
-        // Create resources
-        for (let i = 0; i < asteroid.resources; i++) {
-            this.resources.push({
-                x: asteroid.x + (Math.random() - 0.5) * 30,
-                y: asteroid.y + (Math.random() - 0.5) * 30,
-                vx: (Math.random() - 0.5) * 2,
-                vy: (Math.random() - 0.5) * 2,
-                type: asteroid.type,
-                life: 1,
-                collected: false,
-                magnetRange: 80
-            });
-        }
+        // Create resources using ResourceManager
+        const newResources = this.resourceManager.createResource(asteroid.x, asteroid.y, asteroid.type, asteroid.resources);
+        this.resources.push(...newResources);
         
         this.asteroids.splice(index, 1);
     }
@@ -534,27 +462,10 @@ class CosmicCollectionStation {
     }
     
     updateResources() {
-        // Collect nearby resources (magnetic effect)
-        this.resources.forEach((resource, index) => {
-            const distance = Math.sqrt(
-                (resource.x - this.ship.x) ** 2 + 
-                (resource.y - this.ship.y) ** 2
-            );
-            
-            if (distance < 30) {
-                const dx = this.ship.x - resource.x;
-                const dy = this.ship.y - resource.y;
-                resource.x += dx * 0.2;
-                resource.y += dy * 0.2;
-                
-                if (distance < 15 && this.ship.cargo.length < this.ship.maxCargo) {
-                    this.ship.cargo.push(resource);
-                    this.resources.splice(index, 1);
-                }
-            }
-        });
+        // Use ResourceManager for magnetism and collection
+        this.resourceManager.updateResourceMagnetism(this.resources, this.ship);
         
-        // Collect nearby artifacts
+        // Collect nearby artifacts using ResourceManager
         this.artifacts.forEach((artifact, index) => {
             if (artifact.discovered) {
                 const distance = Math.sqrt(
@@ -568,7 +479,7 @@ class CosmicCollectionStation {
                         ...artifact,
                         discoveredAt: Date.now()
                     });
-                    this.saveDiscoveredArtifacts();
+                    this.resourceManager.saveDiscoveredArtifacts(this.discoveredArtifacts);
                     
                     // Add research value to resources
                     this.totalResources += artifact.value;
@@ -576,8 +487,9 @@ class CosmicCollectionStation {
                     // Remove from current field
                     this.artifacts.splice(index, 1);
                     
-                    // Particle effect
+                    // Particle effect and notification
                     this.createParticles(artifact.x, artifact.y, '#FFD700', 15);
+                    this.ui.showNotification(`✨ Collected ${artifact.rarity} artifact: ${artifact.name} (+${artifact.value} research)`, 'success', 4000);
                     
                     console.log(`Collected artifact: ${artifact.name} (+${artifact.value} research)`);
                 }
@@ -618,34 +530,21 @@ class CosmicCollectionStation {
                 this.scanner.active = false;
             }
             
-            // Check for artifact discoveries
-            this.artifacts.forEach(artifact => {
-                if (!artifact.discovered) {
-                    const distance = Math.sqrt(
-                        (artifact.x - this.ship.x) ** 2 + 
-                        (artifact.y - this.ship.y) ** 2
-                    );
-                    
-                    if (distance <= this.scanner.radius) {
-                        artifact.discovered = true;
-                        this.createParticles(artifact.x, artifact.y, '#FFD700', 10);
-                        
-                        // Show discovery message
-                        setTimeout(async () => {
-                            await this.showAlert('Artifact Discovered!', `🎉 ${artifact.icon} ${artifact.name}\nRarity: ${artifact.rarity.toUpperCase()}\nValue: ${artifact.value} research points`);
-                        }, 100);
-                    }
-                }
+            // Use ResourceManager for artifact discoveries
+            const discoveries = this.resourceManager.discoverArtifacts(this.artifacts, this.ship, this.scanner.radius);
+            
+            // Show enhanced discovery messages
+            discoveries.forEach(artifact => {
+                this.createParticles(artifact.x, artifact.y, '#FFD700', 10);
+                this.ui.showArtifactDiscovery(artifact);
             });
         }
     }
     
     returnToStation() {
-        // Process cargo
-        this.ship.cargo.forEach(resource => {
-            this.totalResources += resource.type === 'rare' ? 3 : 1;
-        });
-        this.ship.cargo = [];
+        // Process cargo using ResourceManager
+        const resourceValue = this.resourceManager.processCargoAtStation(this.ship);
+        this.totalResources += resourceValue;
         
         // Refuel
         this.ship.fuel = this.ship.maxFuel;
@@ -656,8 +555,9 @@ class CosmicCollectionStation {
         // Save progress
         localStorage.setItem('totalResources', this.totalResources.toString());
         
-        // Update station display
+        // Update station display and show notification
         this.stationManager.updateStationDisplay(this.totalResources, this.station);
+        this.ui.showNotification(`⛽ Station docked! +${resourceValue} resources collected`, 'success');
     }
     
     consumeFuel(amount) {
@@ -697,59 +597,8 @@ class CosmicCollectionStation {
             this.renderer.renderStation(this);
         }
         
-        this.updateUI();
-    }
-    
-    updateUI() {
-        const fuelPercentage = (this.ship.fuel / this.ship.maxFuel) * 100;
-        const cargoPercentage = (this.ship.cargo.length / this.ship.maxCargo) * 100;
-        
-        if (document.getElementById('fuelFill')) {
-            document.getElementById('fuelFill').style.width = fuelPercentage + '%';
-            
-            // Fuel warning colors
-            const fuelFill = document.getElementById('fuelFill');
-            if (fuelPercentage < 20) {
-                fuelFill.style.background = 'linear-gradient(90deg, #f44336, #ff5722)'; // Red warning
-            } else if (fuelPercentage < 40) {
-                fuelFill.style.background = 'linear-gradient(90deg, #ff9800, #ffc107)'; // Orange caution
-            } else {
-                fuelFill.style.background = 'linear-gradient(90deg, #4CAF50, #81C784)'; // Green normal
-            }
-        }
-        
-        if (document.getElementById('cargoFill')) {
-            document.getElementById('cargoFill').style.width = cargoPercentage + '%';
-        }
-        if (document.getElementById('cargoCount')) {
-            document.getElementById('cargoCount').textContent = this.ship.cargo.length;
-        }
-        if (document.getElementById('cargoMax')) {
-            document.getElementById('cargoMax').textContent = this.ship.maxCargo;
-        }
-        if (document.getElementById('resourceCount')) {
-            document.getElementById('resourceCount').textContent = this.totalResources;
-        }
-        
-        // Update expedition progress in view indicator
-        if (this.gameState === 'mining' && document.getElementById('viewIndicator')) {
-            const remaining = this.asteroids.length;
-            const fuelWarning = this.ship.fuel < 15 ? ' ⚠️ LOW FUEL' : '';
-            document.getElementById('viewIndicator').textContent = 
-                `🚀 Expedition - Field ${this.expedition.currentField}/${this.expedition.maxFields} (${remaining} asteroids remaining)${fuelWarning}`;
-        }
-        
-        // Emergency fuel warning
-        if (this.gameState === 'mining' && this.ship.fuel <= 10 && !this.fuelWarningShown) {
-            this.fuelWarningShown = true;
-            setTimeout(async () => {
-                const shouldReturn = await this.showConfirm('FUEL CRITICAL!', '⚠️ Return to station immediately?\n\nContinuing may strand you in space!');
-                if (shouldReturn) {
-                    this.returnToStation();
-                }
-                this.fuelWarningShown = false; // Reset warning
-            }, 100);
-        }
+        // Use UIManager for UI updates
+        this.ui.updateGameUI(this);
     }
     
     update() {
@@ -767,31 +616,17 @@ class CosmicCollectionStation {
     }
     
     dockAtStation() {
-        // Transfer cargo to station storage with proper value calculation
-        let resourceValue = 0;
-        this.ship.cargo.forEach(resource => {
-            if (resource.type === 'rare') {
-                resourceValue += 4; // Rare resources worth more
-            } else {
-                resourceValue += 1; // Common resources base value
-            }
-        });
-        
+        // Transfer cargo to station storage using ResourceManager
+        const resourceValue = this.resourceManager.processCargoAtStation(this.ship);
         this.totalResources += resourceValue;
-        this.ship.cargo = [];
         
         // Auto-refuel at station
         this.ship.fuel = this.ship.maxFuel;
         
         // Switch to station view
         this.gameState = 'station';
-        document.getElementById('miningUI').style.display = 'none';
-        document.getElementById('miningControls').style.display = 'none';
-        document.getElementById('stationUI').style.display = 'block';
-        document.getElementById('stationControls').style.display = 'block';
-        document.getElementById('stationGrid').style.display = 'block';
-        document.getElementById('autoMiningIndicator').style.display = 'none';
-        document.getElementById('viewIndicator').textContent = `🏗️ Station Builder - Refueled! (+${resourceValue} resources)`;
+        this.ui.switchToStationUI();
+        this.ui.showStationDocked(resourceValue);
         this.stationManager.updateStationDisplay(this.totalResources, this.station);
         
         // Generate new field for next expedition
@@ -805,45 +640,21 @@ class CosmicCollectionStation {
         }
     }
     
-    // Modal dialog system
+    // Use UIManager for all modal operations
     showModal(title, message, buttons) {
-        return new Promise((resolve) => {
-            document.getElementById('modalTitle').textContent = title;
-            document.getElementById('modalText').textContent = message;
-            
-            const buttonContainer = document.getElementById('modalButtons');
-            buttonContainer.innerHTML = '';
-            
-            buttons.forEach(button => {
-                const btn = document.createElement('button');
-                btn.className = `modal-button ${button.class || 'secondary'}`;
-                btn.textContent = button.text;
-                btn.onclick = () => {
-                    this.hideModal();
-                    resolve(button.value);
-                };
-                buttonContainer.appendChild(btn);
-            });
-            
-            document.getElementById('gameModal').style.display = 'flex';
-        });
+        return this.ui.showModal(title, message, buttons);
     }
     
     hideModal() {
-        document.getElementById('gameModal').style.display = 'none';
+        this.ui.hideModal();
     }
     
     showAlert(title, message) {
-        return this.showModal(title, message, [
-            { text: 'OK', class: 'primary', value: true }
-        ]);
+        return this.ui.showAlert(title, message);
     }
     
     showConfirm(title, message) {
-        return this.showModal(title, message, [
-            { text: 'Yes', class: 'primary', value: true },
-            { text: 'No', class: 'secondary', value: false }
-        ]);
+        return this.ui.showConfirm(title, message);
     }
     
     toggleAutoMining() {
@@ -851,23 +662,16 @@ class CosmicCollectionStation {
         this.autoMining.target = null;
         this.autoMining.targetIndicator.visible = false;
         
-        const indicator = document.getElementById('autoMiningIndicator');
-        const controlsText = document.querySelector('#miningControls div:nth-child(2)');
+        // Use UIManager for auto-mining UI updates
+        this.ui.updateAutoMiningUI(this.autoMining.enabled);
         
-        if (this.autoMining.enabled) {
-            indicator.style.display = 'block';
-            if (controlsText) {
-                controlsText.innerHTML = '🤖 Auto-Mining: ON (Press X to toggle)';
-                controlsText.style.color = '#4CAF50';
-            }
-        } else {
-            indicator.style.display = 'none';
-            if (controlsText) {
-                controlsText.innerHTML = '🔫 Manual Mode: ON (Press X to toggle)';
-                controlsText.style.color = '#ff9800';
-            }
+        if (!this.autoMining.enabled) {
             this.stopMining();
         }
+        
+        // Show notification about the change
+        const status = this.autoMining.enabled ? 'enabled' : 'disabled';
+        this.ui.showNotification(`🤖 Auto-mining ${status}`, 'info', 2000);
     }
 }
 

@@ -68,7 +68,7 @@
         🤖 AUTO-MINING
     </div>
     
-    <!-- Custom Modal Dialog -->
+    <!-- Enhanced Modal Dialog -->
     <div class="modal" id="gameModal">
         <div class="modal-content">
             <div class="modal-title" id="modalTitle">Title</div>
@@ -79,7 +79,9 @@
         </div>
     </div>
 
-    <!-- Load modules first, then main game -->
+    <!-- Load all modules in correct order -->
+    <script src="resources.js"></script>
+    <script src="ui.js"></script>
     <script src="renderer.js"></script>
     <script src="station.js"></script>
     <script src="game.js"></script>

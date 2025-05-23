@@ -21,10 +21,11 @@ canvas {
     top: 10px;
     left: 10px;
     z-index: 100;
-    background: rgba(0, 0, 0, 0.7);
-    padding: 15px;
-    border-radius: 8px;
-    border: 1px solid #333;
+    background: rgba(0, 0, 0, 0.85);
+    padding: 16px;
+    border-radius: 10px;
+    border: 2px solid #333;
+    backdrop-filter: blur(5px);
 }
 
 .fuel-bar, .cargo-bar {
@@ -39,13 +40,13 @@ canvas {
 .fuel-fill {
     height: 100%;
     background: linear-gradient(90deg, #4CAF50, #81C784);
-    transition: width 0.3s ease;
+    transition: width 0.5s ease, background 0.3s ease;
 }
 
 .cargo-fill {
     height: 100%;
     background: linear-gradient(90deg, #2196F3, #64B5F6);
-    transition: width 0.3s ease;
+    transition: width 0.5s ease, background 0.3s ease;
 }
 
 .controls {
@@ -53,22 +54,24 @@ canvas {
     bottom: 10px;
     right: 10px;
     text-align: right;
-    background: rgba(0, 0, 0, 0.7);
-    padding: 15px;
-    border-radius: 8px;
-    border: 1px solid #333;
+    background: rgba(0, 0, 0, 0.85);
+    padding: 16px;
+    border-radius: 10px;
+    border: 2px solid #333;
+    backdrop-filter: blur(5px);
 }
 
 .station-ui {
     position: absolute;
     top: 10px;
     right: 10px;
-    width: 300px;
-    background: rgba(0, 0, 0, 0.8);
+    width: 320px;
+    background: rgba(0, 0, 0, 0.85);
     padding: 20px;
-    border-radius: 10px;
-    border: 1px solid #333;
+    border-radius: 12px;
+    border: 2px solid #333;
     display: none;
+    backdrop-filter: blur(5px);
 }
 
 .station-grid {
@@ -111,6 +114,8 @@ canvas {
 .grid-cell:hover.available {
     background: rgba(76, 175, 80, 0.3);
     border-color: #81C784;
+    transform: scale(1.02);
+    transition: all 0.2s ease;
 }
 
 .module-icon {
@@ -139,21 +144,25 @@ canvas {
 }
 
 .module-item {
-    padding: 8px;
-    margin: 4px 0;
+    padding: 10px;
+    margin: 5px 0;
     background: rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
+    border-radius: 6px;
     cursor: pointer;
-    transition: background 0.3s ease;
+    transition: all 0.3s ease;
+    border: 1px solid transparent;
 }
 
 .module-item:hover {
     background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(76, 175, 80, 0.5);
+    transform: translateX(4px);
 }
 
 .module-item.selected {
     background: rgba(76, 175, 80, 0.3);
     border: 1px solid #4CAF50;
+    box-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
 }
 
 .module-item.unavailable {
@@ -177,15 +186,18 @@ canvas {
     top: 10px;
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(0, 0, 0, 0.8);
-    padding: 10px 20px;
-    border-radius: 8px;
-    border: 1px solid #333;
+    background: rgba(0, 0, 0, 0.85);
+    padding: 12px 24px;
+    border-radius: 10px;
+    border: 2px solid #333;
     font-size: 18px;
+    font-weight: bold;
+    backdrop-filter: blur(5px);
+    transition: all 0.3s ease;
 }
 
 .building {
-    animation: buildAnimation 0.8s ease-out;
+    animation: buildPulse 0.8s ease-out;
 }
 
 .modal {
@@ -206,9 +218,10 @@ canvas {
     padding: 30px;
     border-radius: 15px;
     border: 2px solid #4CAF50;
-    max-width: 400px;
+    max-width: 450px;
     text-align: center;
     box-shadow: 0 0 30px rgba(76, 175, 80, 0.5);
+    animation: modalAppear 0.3s ease-out;
 }
 
 .modal-title {
@@ -260,13 +273,15 @@ canvas {
     position: absolute;
     top: 10px;
     right: 10px;
-    background: rgba(0, 0, 0, 0.8);
-    padding: 8px 15px;
-    border-radius: 6px;
-    border: 1px solid #4CAF50;
+    background: rgba(0, 0, 0, 0.85);
+    padding: 10px 16px;
+    border-radius: 8px;
+    border: 2px solid #4CAF50;
     font-size: 14px;
     color: #4CAF50;
+    font-weight: bold;
     animation: pulse 2s infinite;
+    backdrop-filter: blur(3px);
 }
 
 /* Animations */
@@ -275,7 +290,7 @@ canvas {
     50% { opacity: 1; }
 }
 
-@keyframes buildAnimation {
+@keyframes buildPulse {
     0% { transform: scale(0.8); opacity: 0.5; }
     50% { transform: scale(1.1); opacity: 0.8; }
     100% { transform: scale(1); opacity: 1; }
@@ -284,4 +299,226 @@ canvas {
 @keyframes pulse {
     0%, 100% { box-shadow: 0 0 5px rgba(76, 175, 80, 0.3); }
     50% { box-shadow: 0 0 15px rgba(76, 175, 80, 0.6); }
+}
+
+/* Notification system styles */
+.notification-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 2000;
+    pointer-events: none;
+}
+
+.notification {
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    border-radius: 8px;
+    border-left: 4px solid #4CAF50;
+    min-width: 250px;
+    max-width: 350px;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transform: translateX(100%);
+    opacity: 0;
+    transition: all 0.3s ease;
+    pointer-events: auto;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.notification-info {
+    border-left-color: #2196F3;
+}
+
+.notification-success {
+    border-left-color: #4CAF50;
+}
+
+.notification-warning {
+    border-left-color: #ff9800;
+}
+
+.notification-error {
+    border-left-color: #f44336;
+}
+
+.notification-content {
+    flex: 1;
+    line-height: 1.4;
+}
+
+.notification-close {
+    cursor: pointer;
+    margin-left: 12px;
+    font-size: 18px;
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
+}
+
+.notification-close:hover {
+    opacity: 1;
+}
+
+/* Enhanced modal styles */
+.modal-content {
+    background: #1a1a2e;
+    padding: 30px;
+    border-radius: 15px;
+    border: 2px solid #4CAF50;
+    max-width: 450px;
+    text-align: center;
+    box-shadow: 0 0 30px rgba(76, 175, 80, 0.5);
+    animation: modalAppear 0.3s ease-out;
+}
+
+@keyframes modalAppear {
+    from {
+        transform: scale(0.8);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* Enhanced fuel bar with smoother transitions */
+.fuel-fill, .cargo-fill {
+    transition: width 0.5s ease, background 0.3s ease;
+}
+
+/* Improved grid cell hover effects */
+.grid-cell:hover.available {
+    background: rgba(76, 175, 80, 0.3);
+    border-color: #81C784;
+    transform: scale(1.02);
+    transition: all 0.2s ease;
+}
+
+.grid-cell.building {
+    animation: buildPulse 0.8s ease-out;
+}
+
+@keyframes buildPulse {
+    0% { transform: scale(0.8); opacity: 0.5; }
+    50% { transform: scale(1.1); opacity: 0.8; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+/* Enhanced station UI */
+.station-ui {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 320px;
+    background: rgba(0, 0, 0, 0.85);
+    padding: 20px;
+    border-radius: 12px;
+    border: 2px solid #333;
+    display: none;
+    backdrop-filter: blur(5px);
+}
+
+/* Improved module item styling */
+.module-item {
+    padding: 10px;
+    margin: 5px 0;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 1px solid transparent;
+}
+
+.module-item:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(76, 175, 80, 0.5);
+    transform: translateX(4px);
+}
+
+.module-item.selected {
+    background: rgba(76, 175, 80, 0.3);
+    border: 1px solid #4CAF50;
+    box-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
+}
+
+/* Auto-mining indicator enhancement */
+.auto-mining-indicator {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.85);
+    padding: 10px 16px;
+    border-radius: 8px;
+    border: 2px solid #4CAF50;
+    font-size: 14px;
+    color: #4CAF50;
+    font-weight: bold;
+    animation: pulse 2s infinite;
+    backdrop-filter: blur(3px);
+}
+
+/* Enhanced controls styling */
+.controls {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    text-align: right;
+    background: rgba(0, 0, 0, 0.85);
+    padding: 16px;
+    border-radius: 10px;
+    border: 2px solid #333;
+    backdrop-filter: blur(5px);
+}
+
+.controls div {
+    margin: 4px 0;
+    transition: color 0.3s ease;
+}
+
+/* View indicator enhancement */
+.view-indicator {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.85);
+    padding: 12px 24px;
+    border-radius: 10px;
+    border: 2px solid #333;
+    font-size: 18px;
+    font-weight: bold;
+    backdrop-filter: blur(5px);
+    transition: all 0.3s ease;
+}
+
+/* Responsive design improvements */
+@media (max-width: 768px) {
+    .station-ui {
+        width: 280px;
+        top: 5px;
+        right: 5px;
+    }
+    
+    .controls {
+        bottom: 5px;
+        right: 5px;
+        font-size: 12px;
+    }
+    
+    .ui {
+        top: 5px;
+        left: 5px;
+    }
+    
+    .notification {
+        min-width: 200px;
+        max-width: 280px;
+        font-size: 12px;
+    }
 } 
