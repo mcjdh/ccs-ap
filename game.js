@@ -4,6 +4,10 @@ class CosmicCollectionStation {
         this.ctx = this.canvas.getContext('2d');
         this.setupCanvas();
         
+        // Initialize modules
+        this.renderer = new Renderer(this.canvas, this.ctx);
+        this.stationManager = new StationManager();
+        
         // Game state
         this.gameState = 'mining'; // 'mining' or 'station'
         this.keys = {};
@@ -61,28 +65,20 @@ class CosmicCollectionStation {
         // Resources and progression
         this.totalResources = this.loadTotalResources();
         
-        // Station system
+        // Station system - use stationManager for grid loading
         this.station = {
-            grid: this.loadStationGrid(),
-            size: 1, // Will calculate after initialization
-            tier: 1, // Will calculate after initialization
+            grid: this.stationManager.loadStationGrid(),
+            size: 1,
+            tier: 1,
             selectedModule: null
         };
         
         // Calculate station stats after object is created
-        this.station.size = this.calculateStationSize();
-        this.station.tier = this.calculateStationTier();
+        this.station.size = this.stationManager.calculateStationSize(this.station.grid);
+        this.station.tier = this.stationManager.calculateStationTier(this.station.grid);
         
-        this.modules = {
-            command: { name: 'Command Pod', icon: '🏠', cost: 0, unlocked: true, built: true },
-            storage: { name: 'Storage Bay', icon: '📦', cost: 8, unlocked: true, built: false },
-            research: { name: 'Research Lab', icon: '🔬', cost: 12, unlocked: true, built: false },
-            workshop: { name: 'Workshop', icon: '🔧', cost: 20, unlocked: false, built: false },
-            greenhouse: { name: 'Greenhouse', icon: '🌱', cost: 30, unlocked: false, built: false },
-            observatory: { name: 'Observatory', icon: '🔭', cost: 35, unlocked: false, built: false },
-            quarters: { name: 'Guest Quarters', icon: '🛏️', cost: 45, unlocked: false, built: false },
-            vault: { name: 'Master Vault', icon: '💎', cost: 80, unlocked: false, built: false }
-        };
+        // Use stationManager modules
+        this.modules = this.stationManager.modules;
         
         this.expedition = {
             currentField: 1,
@@ -97,9 +93,9 @@ class CosmicCollectionStation {
         this.generateAsteroids();
         this.setupEventListeners();
         this.setupStationUI();
-        this.loadModuleStates();
-        this.updateShipCapabilities();
-        this.updateStationDisplay();
+        this.stationManager.loadModuleStates();
+        this.stationManager.updateShipCapabilities(this);
+        this.stationManager.updateStationDisplay(this.totalResources, this.station);
         this.gameLoop();
         
         // Hide title after animation
@@ -126,58 +122,6 @@ class CosmicCollectionStation {
             console.warn('Failed to load total resources:', e);
             return 0;
         }
-    }
-    
-    loadStationGrid() {
-        const saved = localStorage.getItem('stationGrid');
-        if (saved) {
-            try {
-                return JSON.parse(saved);
-            } catch (e) {
-                console.warn('Failed to load saved station grid:', e);
-            }
-        }
-        
-        // Initialize with command pod at center
-        const grid = {};
-        grid['2,2'] = 'command';
-        return grid;
-    }
-    
-    saveStationGrid() {
-        try {
-            localStorage.setItem('stationGrid', JSON.stringify(this.station.grid));
-        } catch (e) {
-            console.warn('Failed to save station grid:', e);
-        }
-    }
-    
-    calculateStationSize() {
-        if (!this.station || !this.station.grid || Object.keys(this.station.grid).length === 0) return 1;
-        
-        let minX = 2, maxX = 2, minY = 2, maxY = 2;
-        Object.keys(this.station.grid).forEach(pos => {
-            const [x, y] = pos.split(',').map(Number);
-            if (!isNaN(x) && !isNaN(y)) {
-                minX = Math.min(minX, x);
-                maxX = Math.max(maxX, x);
-                minY = Math.min(minY, y);
-                maxY = Math.max(maxY, y);
-            }
-        });
-        
-        return Math.max(maxX - minX + 1, maxY - minY + 1);
-    }
-    
-    calculateStationTier() {
-        if (!this.station || !this.station.grid) return 1;
-        
-        const builtCount = Object.keys(this.station.grid).length;
-        if (builtCount >= 25) return 5;
-        if (builtCount >= 16) return 4;
-        if (builtCount >= 9) return 3;
-        if (builtCount >= 4) return 2;
-        return 1;
     }
     
     setupEventListeners() {
@@ -245,7 +189,7 @@ class CosmicCollectionStation {
             document.getElementById('stationGrid').style.display = 'block';
             document.getElementById('viewIndicator').textContent = '🏗️ Station Builder';
             document.getElementById('autoMiningIndicator').style.display = 'none';
-            this.updateStationDisplay();
+            this.stationManager.updateStationDisplay(this.totalResources, this.station);
         } else {
             // Starting a new expedition from station
             const launchCost = 8; // Reduced from 20, more accessible
@@ -281,261 +225,8 @@ class CosmicCollectionStation {
     }
     
     setupStationUI() {
-        this.createStationGrid();
-        this.populateModuleList();
-    }
-    
-    createStationGrid() {
-        const gridContainer = document.getElementById('stationGrid');
-        gridContainer.innerHTML = '';
-        
-        // Create 5x5 grid
-        for (let y = 0; y < 5; y++) {
-            for (let x = 0; x < 5; x++) {
-                const cell = document.createElement('div');
-                cell.className = 'grid-cell';
-                cell.dataset.x = x;
-                cell.dataset.y = y;
-                cell.dataset.pos = `${x},${y}`;
-                
-                // Check if this position has a module
-                const moduleType = this.station.grid[`${x},${y}`];
-                if (moduleType) {
-                    cell.classList.add('built');
-                    const module = this.modules[moduleType];
-                    if (module) {
-                        cell.innerHTML = `
-                            <div class="module-icon">${module.icon}</div>
-                            <div class="module-name">${module.name}</div>
-                        `;
-                    }
-                } else if (this.canBuildAt(x, y)) {
-                    cell.classList.add('available');
-                } else {
-                    cell.classList.add('unavailable');
-                }
-                
-                cell.addEventListener('click', () => this.handleGridClick(x, y));
-                gridContainer.appendChild(cell);
-            }
-            gridContainer.appendChild(document.createElement('br'));
-        }
-    }
-    
-    populateModuleList() {
-        const moduleList = document.getElementById('moduleList');
-        moduleList.innerHTML = '';
-        
-        Object.entries(this.modules).forEach(([key, module]) => {
-            if (!module.unlocked) return;
-            
-            const item = document.createElement('div');
-            item.className = 'module-item';
-            
-            const canAfford = this.totalResources >= module.cost;
-            const alreadyBuilt = module.built || Object.values(this.station.grid).includes(key);
-            
-            if (!canAfford || alreadyBuilt) {
-                item.classList.add('unavailable');
-            }
-            
-            item.innerHTML = `
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span>${module.icon} ${module.name}</span>
-                    <span style="color: ${canAfford ? '#4CAF50' : '#f44336'};">
-                        ${alreadyBuilt ? 'Built' : `${module.cost}💎`}
-                    </span>
-                </div>
-            `;
-            
-            if (canAfford && !alreadyBuilt) {
-                item.addEventListener('click', () => this.selectModule(key));
-            }
-            
-            moduleList.appendChild(item);
-        });
-    }
-    
-    selectModule(moduleKey) {
-        this.station.selectedModule = moduleKey;
-        
-        // Update visual selection
-        document.querySelectorAll('.module-item').forEach(item => {
-            item.classList.remove('selected');
-        });
-        
-        // Safely add selection to clicked item
-        const clickedItem = event?.target?.closest('.module-item');
-        if (clickedItem) {
-            clickedItem.classList.add('selected');
-        }
-    }
-    
-    canBuildAt(x, y) {
-        if (!this.station || !this.station.grid) return false;
-        
-        // Can't build if already occupied
-        if (this.station.grid[`${x},${y}`]) return false;
-        
-        // Must be adjacent to existing module
-        const adjacent = [
-            [x-1, y], [x+1, y], [x, y-1], [x, y+1]
-        ];
-        
-        return adjacent.some(([ax, ay]) => {
-            return this.station.grid[`${ax},${ay}`];
-        });
-    }
-    
-    handleGridClick(x, y) {
-        if (!this.station.selectedModule) return;
-        if (!this.canBuildAt(x, y)) return;
-        
-        const module = this.modules[this.station.selectedModule];
-        if (!module || this.totalResources < module.cost) return;
-        
-        // Build the module
-        this.station.grid[`${x},${y}`] = this.station.selectedModule;
-        this.totalResources -= module.cost;
-        module.built = true;
-        
-        // Update station stats
-        this.station.size = this.calculateStationSize();
-        this.station.tier = this.calculateStationTier();
-        
-        // Save progress immediately
-        this.saveStationGrid();
-        this.saveModuleStates();
-        try {
-            localStorage.setItem('totalResources', this.totalResources.toString());
-        } catch (e) {
-            console.warn('Failed to save resources:', e);
-        }
-        
-        // Update ship capabilities first
-        this.updateShipCapabilities();
-        
-        // Unlock new modules based on what was built
-        this.unlockModules();
-        
-        // Update all displays
-        this.createStationGrid();
-        this.populateModuleList();
-        this.updateStationDisplay();
-        
-        // Clear selection
-        this.station.selectedModule = null;
-        document.querySelectorAll('.module-item').forEach(item => {
-            item.classList.remove('selected');
-        });
-        
-        console.log('Built module:', this.station.selectedModule, 'New capabilities:', {
-            maxCargo: this.ship.maxCargo,
-            laserPower: this.laser.power,
-            maxFuel: this.ship.maxFuel
-        });
-    }
-    
-    saveModuleStates() {
-        try {
-            const moduleStates = {};
-            Object.entries(this.modules).forEach(([key, module]) => {
-                moduleStates[key] = {
-                    built: module.built,
-                    unlocked: module.unlocked
-                };
-            });
-            localStorage.setItem('moduleStates', JSON.stringify(moduleStates));
-        } catch (e) {
-            console.warn('Failed to save module states:', e);
-        }
-    }
-    
-    loadModuleStates() {
-        try {
-            const saved = localStorage.getItem('moduleStates');
-            if (saved) {
-                const moduleStates = JSON.parse(saved);
-                Object.entries(moduleStates).forEach(([key, state]) => {
-                    if (this.modules[key]) {
-                        this.modules[key].built = state.built || false;
-                        this.modules[key].unlocked = state.unlocked || this.modules[key].unlocked;
-                    }
-                });
-            }
-        } catch (e) {
-            console.warn('Failed to load module states:', e);
-        }
-    }
-    
-    updateShipCapabilities() {
-        if (!this.modules) return;
-        
-        // Reset to base values first
-        this.ship.maxCargo = 4; // Reduced base capacity
-        this.laser.power = 1.5; // Increased base power  
-        this.ship.maxFuel = 80; // Reduced base fuel
-        
-        // Storage Bay increases cargo capacity significantly
-        if (this.modules.storage && this.modules.storage.built) {
-            this.ship.maxCargo = 8; // Doubled capacity upgrade
-        }
-        
-        // Workshop increases mining power substantially
-        if (this.modules.workshop && this.modules.workshop.built) {
-            this.laser.power = 3.5; // Much more impactful upgrade
-        }
-        
-        // Greenhouse provides fuel efficiency AND capacity
-        if (this.modules.greenhouse && this.modules.greenhouse.built) {
-            this.ship.maxFuel = 150; // More meaningful fuel upgrade
-        }
-        
-        // Observatory adds scanner efficiency (new bonus)
-        if (this.modules.observatory && this.modules.observatory.built) {
-            this.scanner.speed = 12; // Faster scanner
-            this.scanner.maxRadius = 300; // Larger range
-        }
-    }
-    
-    unlockModules() {
-        if (!this.modules) return;
-        
-        // Research Lab should always be unlocked if you have resources
-        this.modules.research.unlocked = true;
-        
-        // Unlock workshop after building storage and research
-        if (this.modules.storage.built && this.modules.research.built) {
-            this.modules.workshop.unlocked = true;
-        }
-        
-        // Unlock advanced modules after workshop
-        if (this.modules.workshop.built) {
-            this.modules.greenhouse.unlocked = true;
-            this.modules.observatory.unlocked = true;
-        }
-        
-        // Unlock guest quarters after having 6+ modules
-        if (this.station && this.station.grid && Object.keys(this.station.grid).length >= 6) {
-            this.modules.quarters.unlocked = true;
-        }
-        
-        // Unlock vault for final tier
-        if (this.station && this.station.tier >= 4) {
-            this.modules.vault.unlocked = true;
-        }
-    }
-    
-    updateStationDisplay() {
-        const resourceEl = document.getElementById('stationResourceCount');
-        const gridSizeEl = document.getElementById('gridSize');
-        const tierEl = document.getElementById('stationTier');
-        
-        if (resourceEl) resourceEl.textContent = this.totalResources;
-        if (gridSizeEl && this.station) gridSizeEl.textContent = `${this.station.size}x${this.station.size}`;
-        if (tierEl && this.station) tierEl.textContent = this.station.tier;
-        
-        this.unlockModules();
+        this.stationManager.createStationGrid(this.station.grid, this);
+        this.stationManager.populateModuleList(this.totalResources, this.station.grid);
     }
     
     generateAsteroids() {
@@ -966,7 +657,7 @@ class CosmicCollectionStation {
         localStorage.setItem('totalResources', this.totalResources.toString());
         
         // Update station display
-        this.updateStationDisplay();
+        this.stationManager.updateStationDisplay(this.totalResources, this.station);
     }
     
     consumeFuel(amount) {
@@ -1001,279 +692,12 @@ class CosmicCollectionStation {
     
     render() {
         if (this.gameState === 'mining') {
-            this.renderMining();
+            this.renderer.renderMining(this);
         } else {
-            this.renderStation();
+            this.renderer.renderStation(this);
         }
         
         this.updateUI();
-    }
-    
-    renderMining() {
-        // Clear canvas
-        this.ctx.fillStyle = 'rgba(10, 10, 15, 0.1)';
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-        
-        // Draw stars (background)
-        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-        for (let i = 0; i < 50; i++) {
-            const x = (i * 137.5) % this.canvas.width;
-            const y = (i * 234.7) % this.canvas.height;
-            this.ctx.fillRect(x, y, 1, 1);
-        }
-        
-        // Draw scanner pulse
-        if (this.scanner.active) {
-            this.ctx.strokeStyle = `rgba(100, 255, 100, ${this.scanner.pulseTime})`;
-            this.ctx.lineWidth = 2;
-            this.ctx.beginPath();
-            this.ctx.arc(this.ship.x, this.ship.y, this.scanner.radius, 0, Math.PI * 2);
-            this.ctx.stroke();
-        }
-        
-        // Draw asteroids
-        this.asteroids.forEach(asteroid => {
-            const healthRatio = asteroid.health / asteroid.maxHealth;
-            
-            this.ctx.save();
-            this.ctx.translate(asteroid.x, asteroid.y);
-            this.ctx.rotate(asteroid.rotation);
-            
-            // Health-based coloring
-            if (asteroid.type === 'rare') {
-                this.ctx.fillStyle = `rgba(255, 107, 157, ${0.3 + healthRatio * 0.7})`;
-            } else {
-                this.ctx.fillStyle = `rgba(97, 218, 251, ${0.3 + healthRatio * 0.7})`;
-            }
-            
-            // Draw asteroid shape
-            this.ctx.beginPath();
-            for (let i = 0; i < 8; i++) {
-                const angle = (i / 8) * Math.PI * 2;
-                const radius = asteroid.size * (0.8 + Math.sin(angle * 3) * 0.2);
-                const x = Math.cos(angle) * radius;
-                const y = Math.sin(angle) * radius;
-                if (i === 0) this.ctx.moveTo(x, y);
-                else this.ctx.lineTo(x, y);
-            }
-            this.ctx.closePath();
-            this.ctx.fill();
-            
-            // Draw outline
-            this.ctx.strokeStyle = asteroid.type === 'rare' ? '#ff6b9d' : '#61dafb';
-            this.ctx.lineWidth = 1;
-            this.ctx.stroke();
-            
-            this.ctx.restore();
-            
-            asteroid.rotation += asteroid.rotationSpeed;
-        });
-        
-        // Draw resources
-        this.resources.forEach(resource => {
-            this.ctx.fillStyle = resource.type === 'rare' ? '#ff6b9d' : '#61dafb';
-            this.ctx.beginPath();
-            this.ctx.arc(resource.x, resource.y, 3, 0, Math.PI * 2);
-            this.ctx.fill();
-            
-            // Glow effect
-            this.ctx.fillStyle = resource.type === 'rare' ? 'rgba(255, 107, 157, 0.3)' : 'rgba(97, 218, 251, 0.3)';
-            this.ctx.beginPath();
-            this.ctx.arc(resource.x, resource.y, 8, 0, Math.PI * 2);
-            this.ctx.fill();
-        });
-        
-        // Draw artifacts
-        this.artifacts.forEach(artifact => {
-            artifact.pulsePhase += 0.1;
-            const pulse = Math.sin(artifact.pulsePhase) * 0.3 + 0.7;
-            
-            if (artifact.discovered) {
-                // Discovered artifacts glow brightly
-                this.ctx.fillStyle = `rgba(255, 215, 0, ${pulse})`;
-                this.ctx.beginPath();
-                this.ctx.arc(artifact.x, artifact.y, 20, 0, Math.PI * 2);
-                this.ctx.fill();
-                
-                // Artifact icon
-                this.ctx.fillStyle = '#FFD700';
-                this.ctx.font = '20px monospace';
-                this.ctx.textAlign = 'center';
-                this.ctx.fillText(artifact.icon, artifact.x, artifact.y + 7);
-                
-                // Rarity indicator
-                let rarityColor = '#ffffff';
-                if (artifact.rarity === 'legendary') rarityColor = '#ff6b9d';
-                else if (artifact.rarity === 'epic') rarityColor = '#9b59b6';
-                else if (artifact.rarity === 'rare') rarityColor = '#3498db';
-                else if (artifact.rarity === 'uncommon') rarityColor = '#2ecc71';
-                
-                this.ctx.strokeStyle = rarityColor;
-                this.ctx.lineWidth = 2;
-                this.ctx.beginPath();
-                this.ctx.arc(artifact.x, artifact.y, 15, 0, Math.PI * 2);
-                this.ctx.stroke();
-            } else {
-                // Hidden artifacts show faint energy signature
-                this.ctx.fillStyle = `rgba(100, 255, 100, ${pulse * 0.3})`;
-                this.ctx.beginPath();
-                this.ctx.arc(artifact.x, artifact.y, 5, 0, Math.PI * 2);
-                this.ctx.fill();
-            }
-        });
-        
-        // Draw particles
-        this.particles.forEach(particle => {
-            this.ctx.fillStyle = `${particle.color}${Math.floor(particle.life * 255).toString(16).padStart(2, '0')}`;
-            this.ctx.beginPath();
-            this.ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
-            this.ctx.fill();
-        });
-        
-        // Draw mining laser
-        if (this.laser.active) {
-            this.ctx.strokeStyle = '#ff4444';
-            this.ctx.lineWidth = 2;
-            this.ctx.beginPath();
-            this.ctx.moveTo(this.laser.x, this.laser.y);
-            this.ctx.lineTo(this.laser.targetX, this.laser.targetY);
-            this.ctx.stroke();
-            
-            // Laser glow
-            this.ctx.strokeStyle = 'rgba(255, 68, 68, 0.3)';
-            this.ctx.lineWidth = 6;
-            this.ctx.stroke();
-        }
-        
-        // Draw auto-mining target indicator
-        if (this.autoMining.enabled && this.autoMining.targetIndicator.visible) {
-            const time = Date.now() * 0.005;
-            const pulse = Math.sin(time) * 0.3 + 0.7;
-            
-            this.ctx.strokeStyle = `rgba(76, 175, 80, ${pulse})`;
-            this.ctx.lineWidth = 2;
-            this.ctx.setLineDash([5, 5]);
-            this.ctx.beginPath();
-            this.ctx.arc(this.autoMining.targetIndicator.x, this.autoMining.targetIndicator.y, 30, 0, Math.PI * 2);
-            this.ctx.stroke();
-            this.ctx.setLineDash([]); // Reset line dash
-            
-            // Target crosshair
-            this.ctx.strokeStyle = `rgba(76, 175, 80, ${pulse * 0.8})`;
-            this.ctx.lineWidth = 1;
-            const x = this.autoMining.targetIndicator.x;
-            const y = this.autoMining.targetIndicator.y;
-            this.ctx.beginPath();
-            this.ctx.moveTo(x - 10, y);
-            this.ctx.lineTo(x + 10, y);
-            this.ctx.moveTo(x, y - 10);
-            this.ctx.lineTo(x, y + 10);
-            this.ctx.stroke();
-        }
-        
-        // Draw auto-mining search range when no targets (subtle feedback)
-        if (this.autoMining.enabled && !this.autoMining.targetIndicator.visible && this.asteroids.length > 0) {
-            const time = Date.now() * 0.002;
-            const pulse = Math.sin(time) * 0.1 + 0.15;
-            
-            this.ctx.strokeStyle = `rgba(76, 175, 80, ${pulse})`;
-            this.ctx.lineWidth = 1;
-            this.ctx.setLineDash([2, 8]);
-            this.ctx.beginPath();
-            this.ctx.arc(this.ship.x, this.ship.y, this.autoMining.searchRadius, 0, Math.PI * 2);
-            this.ctx.stroke();
-            this.ctx.setLineDash([]); // Reset line dash
-        }
-        
-        // Draw ship
-        this.ctx.save();
-        this.ctx.translate(this.ship.x, this.ship.y);
-        this.ctx.rotate(this.ship.angle);
-        
-        // Ship body
-        this.ctx.fillStyle = '#4CAF50';
-        this.ctx.beginPath();
-        this.ctx.moveTo(this.ship.size, 0);
-        this.ctx.lineTo(-this.ship.size, -this.ship.size/2);
-        this.ctx.lineTo(-this.ship.size/2, 0);
-        this.ctx.lineTo(-this.ship.size, this.ship.size/2);
-        this.ctx.closePath();
-        this.ctx.fill();
-        
-        // Ship outline
-        this.ctx.strokeStyle = '#81C784';
-        this.ctx.lineWidth = 1;
-        this.ctx.stroke();
-        
-        this.ctx.restore();
-    }
-    
-    renderStation() {
-        // Clear canvas with station background
-        this.ctx.fillStyle = '#0a0a0f';
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-        
-        // Draw station background pattern
-        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-        this.ctx.lineWidth = 1;
-        for (let x = 0; x < this.canvas.width; x += 50) {
-            this.ctx.beginPath();
-            this.ctx.moveTo(x, 0);
-            this.ctx.lineTo(x, this.canvas.height);
-            this.ctx.stroke();
-        }
-        for (let y = 0; y < this.canvas.height; y += 50) {
-            this.ctx.beginPath();
-            this.ctx.moveTo(0, y);
-            this.ctx.lineTo(this.canvas.width, y);
-            this.ctx.stroke();
-        }
-        
-        // Draw centered station diagram
-        const centerX = this.canvas.width / 2;
-        const centerY = this.canvas.height / 2;
-        const cellSize = 40;
-        
-        this.ctx.save();
-        this.ctx.translate(centerX - 2.5 * cellSize, centerY - 2.5 * cellSize);
-        
-        // Draw grid outline
-        this.ctx.strokeStyle = '#333';
-        this.ctx.lineWidth = 2;
-        for (let x = 0; x <= 5; x++) {
-            this.ctx.beginPath();
-            this.ctx.moveTo(x * cellSize, 0);
-            this.ctx.lineTo(x * cellSize, 5 * cellSize);
-            this.ctx.stroke();
-        }
-        for (let y = 0; y <= 5; y++) {
-            this.ctx.beginPath();
-            this.ctx.moveTo(0, y * cellSize);
-            this.ctx.lineTo(5 * cellSize, y * cellSize);
-            this.ctx.stroke();
-        }
-        
-        // Draw modules
-        Object.entries(this.station.grid).forEach(([pos, moduleType]) => {
-            const [x, y] = pos.split(',').map(Number);
-            const module = this.modules[moduleType];
-            
-            if (module) {
-                this.ctx.fillStyle = 'rgba(76, 175, 80, 0.3)';
-                this.ctx.fillRect(x * cellSize + 2, y * cellSize + 2, cellSize - 4, cellSize - 4);
-                
-                this.ctx.fillStyle = '#4CAF50';
-                this.ctx.font = '20px monospace';
-                this.ctx.textAlign = 'center';
-                this.ctx.fillText(module.icon, x * cellSize + cellSize/2, y * cellSize + cellSize/2 + 7);
-                
-                this.ctx.font = '8px monospace';
-                this.ctx.fillStyle = '#fff';
-                this.ctx.fillText(module.name, x * cellSize + cellSize/2, y * cellSize + cellSize - 4);
-            }
-        });
-        
-        this.ctx.restore();
     }
     
     updateUI() {
@@ -1368,7 +792,7 @@ class CosmicCollectionStation {
         document.getElementById('stationGrid').style.display = 'block';
         document.getElementById('autoMiningIndicator').style.display = 'none';
         document.getElementById('viewIndicator').textContent = `🏗️ Station Builder - Refueled! (+${resourceValue} resources)`;
-        this.updateStationDisplay();
+        this.stationManager.updateStationDisplay(this.totalResources, this.station);
         
         // Generate new field for next expedition
         this.generateAsteroids();
