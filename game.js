@@ -25,11 +25,12 @@ class CosmicCollectionStation {
             angle: 0,
             vx: 0,
             vy: 0,
-            fuel: 100,
-            maxFuel: 100,
+            fuel: 120, // More generous starting fuel
+            maxFuel: 120, // Higher starting capacity
             cargo: [],
             maxCargo: 6,
-            size: 8
+            size: 8,
+            fuelEfficiency: 1 // Base efficiency
         };
         
         // Mining laser
@@ -121,11 +122,16 @@ class CosmicCollectionStation {
     loadTotalResources() {
         try {
             const saved = localStorage.getItem('totalResources');
+            if (saved === null) {
+                // First time playing - give starter bonus for better experience
+                this.ui.showNotification(`🌟 Welcome to space! Starting bonus: 15 resources`, 'success', 4000);
+                return 15;
+            }
             const parsed = parseInt(saved || '0');
             return isNaN(parsed) ? 0 : Math.max(0, parsed);
         } catch (e) {
             console.warn('Failed to load total resources:', e);
-            return 0;
+            return 15; // Default starter bonus on error
         }
     }
     
@@ -198,6 +204,26 @@ class CosmicCollectionStation {
         window.addEventListener('resize', () => {
             this.setupCanvas();
         });
+        
+        // Reset progress button
+        document.addEventListener('DOMContentLoaded', () => {
+            const resetBtn = document.getElementById('resetProgressBtn');
+            if (resetBtn) {
+                resetBtn.addEventListener('click', () => {
+                    this.showResetConfirmation();
+                });
+            }
+        });
+        
+        // Also set up the button if DOM is already loaded
+        setTimeout(() => {
+            const resetBtn = document.getElementById('resetProgressBtn');
+            if (resetBtn) {
+                resetBtn.addEventListener('click', () => {
+                    this.showResetConfirmation();
+                });
+            }
+        }, 100);
     }
     
     toggleView() {
@@ -205,9 +231,16 @@ class CosmicCollectionStation {
             this.gameState = 'station';
             this.ui.switchToStationUI();
             this.stationManager.updateStationDisplay(this.totalResources, this.station);
+            
+            // Show helpful guidance for new players at station
+            if (this.totalResources < 25) { // Early game guidance
+                setTimeout(() => {
+                    this.ui.showNotification(`💡 Build Storage Bay & Research Lab to unlock more modules!`, 'info', 5000);
+                }, 1000);
+            }
         } else {
             // Starting a new expedition from station
-            const launchCost = 8; // Reduced from 20, more accessible
+            const launchCost = 5; // Reduced further for better early game experience
             if (this.ship.fuel >= launchCost) {
                 // Reset session stats for new expedition
                 this.sessionStats = {
@@ -238,12 +271,26 @@ class CosmicCollectionStation {
                     document.getElementById('autoMiningIndicator').style.display = 'block';
                 }
                 
+                // Show helpful controls reminder for new players
+                if (this.sessionStats.totalAsteroidsMined < 20) {
+                    setTimeout(() => {
+                        this.ui.showNotification(`🎮 WASD to move, Space to scan, R to return to station`, 'info', 4000);
+                    }, 1000);
+                }
+                
                 // Show Master Artifact progress if not all collected
                 if (this.resourceManager.playerStats.masterArtifactsCollected.length < 5) {
                     this.ui.showMasterArtifactProgress(this.resourceManager.getMasterArtifactProgress(this.sessionStats));
                 }
             } else {
                 this.ui.showInsufficientFuel(launchCost);
+                
+                // Additional guidance if fuel is very low
+                if (this.ship.fuel < 20) {
+                    setTimeout(() => {
+                        this.ui.showNotification(`💡 Build a Greenhouse to increase fuel capacity!`, 'info', 4000);
+                    }, 1000);
+                }
             }
         }
     }
@@ -348,7 +395,7 @@ class CosmicCollectionStation {
                 
                 // Auto-mine if in range with improved range
                 const miningRange = 140; // Increased mining range
-                if (nearestDistance < miningRange && this.ship.fuel > 0) {
+                if (nearestDistance < miningRange && this.ship.fuel > 5) { // Reserve 5 fuel for return
                     this.laser.active = true;
                     this.laser.x = this.ship.x;
                     this.laser.y = this.ship.y;
@@ -367,27 +414,31 @@ class CosmicCollectionStation {
             this.autoMining.targetIndicator.visible = false;
         }
         
-        // Ship movement (same for both modes)
+        // Ship movement with improved fuel efficiency
         const acceleration = 0.3;
         const friction = 0.95;
         const maxSpeed = 4;
         
-        // Reduced fuel consumption for movement (more exploration-friendly)
+        // Apply fuel efficiency from station upgrades
+        const fuelEfficiency = this.ship.fuelEfficiency || 1;
+        const baseFuelConsumption = 0.03 / fuelEfficiency; // More efficient base consumption
+        
+        // Movement fuel consumption (only when actively moving)
         if (this.keys['w'] || this.keys['arrowup']) {
             this.ship.vy -= acceleration;
-            this.consumeFuel(0.05);
+            this.consumeFuel(baseFuelConsumption);
         }
         if (this.keys['s'] || this.keys['arrowdown']) {
             this.ship.vy += acceleration;
-            this.consumeFuel(0.05);
+            this.consumeFuel(baseFuelConsumption);
         }
         if (this.keys['a'] || this.keys['arrowleft']) {
             this.ship.vx -= acceleration;
-            this.consumeFuel(0.05);
+            this.consumeFuel(baseFuelConsumption);
         }
         if (this.keys['d'] || this.keys['arrowright']) {
             this.ship.vx += acceleration;
-            this.consumeFuel(0.05);
+            this.consumeFuel(baseFuelConsumption);
         }
         
         // Apply friction
@@ -410,6 +461,17 @@ class CosmicCollectionStation {
         if (this.ship.x > this.canvas.width) this.ship.x = 0;
         if (this.ship.y < 0) this.ship.y = this.canvas.height;
         if (this.ship.y > this.canvas.height) this.ship.y = 0;
+        
+        // Emergency low fuel warning and auto-return
+        if (this.ship.fuel <= 10 && this.ship.fuel > 0) {
+            this.ui.showNotification(`⚠️ Low fuel! Press R to return to station`, 'warning', 4000);
+        }
+        
+        // Auto-return if fuel gets critically low (prevents softlock)
+        if (this.ship.fuel <= 2) {
+            this.ui.showNotification(`🚨 Emergency return to station!`, 'error', 3000);
+            this.returnToStation();
+        }
     }
     
     startMining() {
@@ -429,7 +491,19 @@ class CosmicCollectionStation {
     updateMining() {
         if (!this.laser.active || this.gameState !== 'mining') return;
         
-        this.consumeFuel(0.2);
+        // Apply fuel efficiency from station upgrades
+        const fuelEfficiency = this.ship.fuelEfficiency || 1;
+        const miningFuelCost = 0.15 / fuelEfficiency; // More efficient mining
+        
+        // Only consume fuel if we have enough (reserve some for return)
+        if (this.ship.fuel > 5) {
+            this.consumeFuel(miningFuelCost);
+        } else {
+            // Stop mining if fuel is too low
+            this.laser.active = false;
+            this.ui.showNotification(`⛽ Not enough fuel for mining! Return to station.`, 'warning', 3000);
+            return;
+        }
         
         // Check laser collision with asteroids
         this.asteroids.forEach((asteroid, index) => {
@@ -648,22 +722,9 @@ class CosmicCollectionStation {
     }
     
     returnToStation() {
-        // Process cargo using ResourceManager
-        const resourceValue = this.resourceManager.processCargoAtStation(this.ship);
-        this.totalResources += resourceValue;
-        
-        // Refuel
-        this.ship.fuel = this.ship.maxFuel;
-        
-        // Generate new field
-        this.generateAsteroids();
-        
-        // Save progress
-        localStorage.setItem('totalResources', this.totalResources.toString());
-        
-        // Update station display and show notification
-        this.stationManager.updateStationDisplay(this.totalResources, this.station);
-        this.ui.showNotification(`⛽ Station docked! +${resourceValue} resources collected`, 'success');
+        // End the current expedition and dock at station
+        this.expedition.returnToStation = true;
+        this.dockAtStation();
     }
     
     consumeFuel(amount) {
@@ -722,12 +783,77 @@ class CosmicCollectionStation {
     }
     
     dockAtStation() {
+        // Calculate storage capacity and bonuses from station
+        const storageInfo = this.stationManager.calculateStorageCapacity(this.station.grid);
+        
         // Transfer cargo to station storage using ResourceManager
-        const resourceValue = this.resourceManager.processCargoAtStation(this.ship);
+        let resourceValue = this.resourceManager.processCargoAtStation(this.ship);
+        
+        // Apply factory resource multiplier if available
+        if (this.factory && this.factory.resourceMultiplier > 1) {
+            const factoryBonus = Math.floor(resourceValue * (this.factory.resourceMultiplier - 1));
+            resourceValue += factoryBonus;
+            this.ui.showNotification(`🏭 Factory processed ${factoryBonus} additional resources!`, 'success');
+        }
+        
+        // Apply garden bio-resource multiplier for biological materials
+        if (this.garden && this.garden.bioMultiplier > 1) {
+            const bioBonus = Math.floor(resourceValue * (this.garden.bioMultiplier - 1) * 0.3); // 30% of resources are biological
+            resourceValue += bioBonus;
+            if (bioBonus > 0) {
+                this.ui.showNotification(`🌿 Garden enhanced bio-materials: +${bioBonus} resources!`, 'success');
+            }
+        }
+        
+        // Apply station tier resource bonus
+        if (this.stationTierResourceBonus > 0) {
+            resourceValue += this.stationTierResourceBonus;
+            this.ui.showNotification(`🏗️ Station tier bonus: +${this.stationTierResourceBonus} resources!`, 'epic');
+        }
+        
+        // Apply Master Artifact bonuses if vault is built and we have artifacts
+        if (this.vault && this.masterArtifactBonus > 1) {
+            const masterBonus = Math.floor(resourceValue * (this.masterArtifactBonus - 1));
+            resourceValue += masterBonus;
+            if (masterBonus > 0) {
+                this.ui.showNotification(`🌌 Master Artifact resonance: +${masterBonus} resources!`, 'legendary');
+            }
+        }
+        
         this.totalResources += resourceValue;
         
-        // Auto-refuel at station
+        // Full refuel with optional regeneration bonus
+        if (this.ship.fuelRegenRate && this.ship.fuelRegenRate > 0) {
+            const regenAmount = Math.floor(this.ship.maxFuel * this.ship.fuelRegenRate);
+            this.ship.fuel = Math.min(this.ship.maxFuel, this.ship.fuel + regenAmount);
+            if (regenAmount > 0) {
+                this.ui.showNotification(`🌱 Greenhouse regenerated ${regenAmount} fuel!`, 'success');
+            }
+        }
+        // Always ensure full refuel at station
         this.ship.fuel = this.ship.maxFuel;
+        
+        // Reset expedition state for new expedition
+        this.expedition = {
+            currentField: 1,
+            maxFields: 5,
+            fieldsCleared: 0,
+            returnToStation: false
+        };
+        
+        // Reset session stats for new expedition
+        this.sessionStats = {
+            resourcesCollected: 0,
+            epicArtifactsFound: 0,
+            asteroidsMined: 0,
+            totalAsteroidsMined: this.sessionStats.totalAsteroidsMined || 0, // Preserve career total
+            miningEfficiency: 1.0
+        };
+        
+        // Check for storage warnings
+        if (storageInfo.capacity < this.totalResources) {
+            this.ui.showNotification(`⚠️ Storage at capacity! Consider building more Storage Bays.`, 'warning');
+        }
         
         // Switch to station view
         this.gameState = 'station';
@@ -744,6 +870,26 @@ class CosmicCollectionStation {
         } catch (e) {
             console.warn('Failed to save resources:', e);
         }
+        
+        // Log detailed station capabilities for debugging
+        console.log('Station docking complete:', {
+            resourcesGained: resourceValue,
+            totalResources: this.totalResources,
+            storageCapacity: storageInfo.capacity,
+            stationTier: this.station.tier,
+            expeditionReset: true,
+            fuelStatus: this.ship.fuel + '/' + this.ship.maxFuel,
+            capabilities: {
+                maxCargo: this.ship.maxCargo,
+                laserPower: this.laser.power,
+                maxFuel: this.ship.maxFuel,
+                fuelEfficiency: this.ship.fuelEfficiency,
+                factory: this.factory,
+                garden: this.garden,
+                reactor: this.reactor,
+                vault: this.vault
+            }
+        });
     }
     
     // Use UIManager for all modal operations
@@ -899,6 +1045,34 @@ class CosmicCollectionStation {
     resetProgress() {
         localStorage.clear();
         this.ui.showNotification('🔧 Progress reset - reload page to restart', 'warning', 5000);
+    }
+    
+    showResetConfirmation() {
+        this.ui.showModal(
+            '⚠️ Reset Game Progress',
+            'Are you sure you want to reset ALL game progress? This will:\n\n• Clear all resources and station modules\n• Reset Master Artifact progress\n• Clear all discovered artifacts\n• Reset station building progress\n\nThis action cannot be undone!',
+            [
+                { text: 'Cancel', class: 'secondary', value: 'cancel' },
+                { text: 'Reset Everything', class: 'primary', value: 'confirm', style: 'background: #f44336; border-color: #f44336;' }
+            ]
+        ).then(result => {
+            if (result === 'confirm') {
+                this.performReset();
+            }
+        });
+    }
+    
+    performReset() {
+        // Clear all localStorage data
+        localStorage.clear();
+        
+        // Show confirmation and reload instructions
+        this.ui.showNotification('🔄 Game progress reset! Reloading page...', 'warning', 3000);
+        
+        // Auto-reload after a brief delay
+        setTimeout(() => {
+            window.location.reload();
+        }, 2000);
     }
 }
 

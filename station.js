@@ -2,15 +2,165 @@
 class StationManager {
     constructor() {
         this.modules = {
-            command: { name: 'Command Pod', icon: '🏠', cost: 0, unlocked: true, built: true },
-            storage: { name: 'Storage Bay', icon: '📦', cost: 8, unlocked: true, built: false },
-            research: { name: 'Research Lab', icon: '🔬', cost: 12, unlocked: true, built: false },
-            workshop: { name: 'Workshop', icon: '🔧', cost: 20, unlocked: false, built: false },
-            greenhouse: { name: 'Greenhouse', icon: '🌱', cost: 30, unlocked: false, built: false },
-            observatory: { name: 'Observatory', icon: '🔭', cost: 35, unlocked: false, built: false },
-            quarters: { name: 'Guest Quarters', icon: '🛏️', cost: 45, unlocked: false, built: false },
-            vault: { name: 'Master Vault', icon: '🌌', cost: 100, unlocked: false, built: false, description: 'Requires all 5 Master Artifacts' }
+            command: { 
+                name: 'Command Pod', 
+                icon: '🏠', 
+                cost: [0, 0, 0], 
+                tier: 1,
+                unlocked: true, 
+                built: true,
+                description: 'Central hub of your station',
+                benefits: ['Base docking capability', 'Station network core', 'Emergency systems'],
+                stationTierBonus: [0, 0, 0]
+            },
+            storage: { 
+                name: 'Storage Bay', 
+                icon: '📦', 
+                cost: [8, 25, 60], 
+                tier: 1,
+                unlocked: true, 
+                built: false,
+                description: 'Specialized resource storage',
+                benefits: ['+25 storage capacity', '+50 storage + sorting', '+100 storage + quantum compression'],
+                storageTypes: ['basic', 'specialized', 'quantum'],
+                stationTierBonus: [5, 10, 20]
+            },
+            research: { 
+                name: 'Research Lab', 
+                icon: '🔬', 
+                cost: [12, 35, 80], 
+                tier: 1,
+                unlocked: true, 
+                built: false,
+                description: 'Analyze artifacts and unlock blueprints',
+                benefits: ['Basic analysis', 'Advanced research', 'Quantum archaeology'],
+                researchSpeed: [1, 2, 4],
+                artifactBonus: [1, 1.5, 2.5],
+                stationTierBonus: [2, 5, 10]
+            },
+            workshop: { 
+                name: 'Workshop', 
+                icon: '🔧', 
+                cost: [20, 50, 120], 
+                tier: 1,
+                unlocked: false, 
+                built: false,
+                description: 'Craft equipment and ship upgrades',
+                benefits: ['Basic tools', 'Advanced manufacturing', 'Nano-fabrication'],
+                efficiency: [1, 1.5, 2.5],
+                miningBonus: [0.5, 1.0, 2.0],
+                stationTierBonus: [3, 7, 15]
+            },
+            greenhouse: { 
+                name: 'Greenhouse', 
+                icon: '🌱', 
+                cost: [30, 70, 150], 
+                tier: 1,
+                unlocked: false, 
+                built: false,
+                description: 'Fuel production and life support',
+                benefits: ['+20 fuel capacity', '+40 fuel + efficiency', '+80 fuel + regeneration'],
+                fuelBonus: [20, 40, 80],
+                efficiency: [1, 1.25, 1.5],
+                fuelRegen: [0, 0.1, 0.25],
+                stationTierBonus: [2, 5, 10]
+            },
+            garden: {
+                name: 'Hydro Garden',
+                icon: '🌿',
+                cost: [25, 60, 140],
+                tier: 1,
+                unlocked: false,
+                built: false,
+                description: 'Advanced biological research and crew comfort',
+                benefits: ['Basic bio-processing', 'Enhanced crew efficiency', 'Exotic bio-synthesis'],
+                efficiency: [1, 1.3, 1.8],
+                comfortBonus: [0.1, 0.25, 0.5],
+                bioResourceMultiplier: [1.2, 1.5, 2.0],
+                stationTierBonus: [2, 4, 8]
+            },
+            observatory: { 
+                name: 'Observatory', 
+                icon: '🔭', 
+                cost: [35, 80, 180], 
+                tier: 1,
+                unlocked: false, 
+                built: false,
+                description: 'Enhanced scanner and navigation',
+                benefits: ['+25% scanner range', '+50% range + speed', '+100% range + deep space detection'],
+                scanBonus: [1.25, 1.5, 2.0],
+                artifactDetection: [1, 1.5, 2.5],
+                fieldDiscoveryBonus: [0, 0.1, 0.25],
+                stationTierBonus: [3, 6, 12]
+            },
+            factory: {
+                name: 'Auto-Factory',
+                icon: '🏭',
+                cost: [50, 120, 250],
+                tier: 1,
+                unlocked: false,
+                built: false,
+                description: 'Automated resource processing and refinement',
+                benefits: ['Basic automation', 'Advanced processing', 'Quantum manufacturing'],
+                efficiency: [1.2, 1.6, 2.5],
+                resourceMultiplier: [1.1, 1.3, 1.8],
+                automationLevel: [0.1, 0.3, 0.6],
+                stationTierBonus: [4, 8, 16]
+            },
+            quarters: { 
+                name: 'Crew Quarters', 
+                icon: '🛏️', 
+                cost: [45, 100, 200], 
+                tier: 1,
+                unlocked: false, 
+                built: false,
+                description: 'Advanced station operations and crew support',
+                benefits: ['Basic crew support', 'Automated systems', 'AI assistance'],
+                automation: [0, 0.1, 0.25],
+                efficiencyBonus: [0.05, 0.15, 0.3],
+                stationTierBonus: [3, 6, 12]
+            },
+            reactor: {
+                name: 'Fusion Reactor',
+                icon: '⚛️',
+                cost: [80, 180, 350],
+                tier: 1,
+                unlocked: false,
+                built: false,
+                description: 'Power generation and energy management',
+                benefits: ['Basic power grid', 'Enhanced energy systems', 'Quantum power core'],
+                powerOutput: [1, 2, 4],
+                efficiencyBonus: [0.1, 0.25, 0.5],
+                stationWideBonus: [0.05, 0.15, 0.3],
+                stationTierBonus: [5, 10, 20]
+            },
+            vault: { 
+                name: 'Master Vault', 
+                icon: '🌌', 
+                cost: [100, 250, 500], 
+                tier: 1,
+                unlocked: false, 
+                built: false, 
+                description: 'Houses Master Artifacts and cosmic technologies',
+                benefits: ['Artifact storage', 'Quantum resonance', 'Cosmic convergence'],
+                masterArtifactBonus: [1, 1.5, 2.0],
+                cosmicEfficiency: [1, 1.3, 2.0],
+                stationTierBonus: [10, 20, 50]
+            }
         };
+
+        // Resource types for specialized storage
+        this.resourceTypes = {
+            basic: { name: 'Basic Materials', icon: '⚙️', color: '#888888' },
+            precious: { name: 'Precious Metals', icon: '💎', color: '#FFD700' },
+            energy: { name: 'Energy Crystals', icon: '⚡', color: '#00FFFF' },
+            biological: { name: 'Bio-Matter', icon: '🧬', color: '#00FF00' },
+            quantum: { name: 'Quantum Materials', icon: '🔮', color: '#9966FF' }
+        };
+
+        // Track station efficiency bonuses
+        this.adjacencyBonuses = new Map();
+        this.specializationBonuses = new Map();
     }
 
     loadStationGrid() {
@@ -69,6 +219,9 @@ class StationManager {
         const gridContainer = document.getElementById('stationGrid');
         gridContainer.innerHTML = '';
         
+        // Calculate adjacency bonuses first
+        this.calculateAdjacencyBonuses(grid);
+        
         // Create 5x5 grid
         for (let y = 0; y < 5; y++) {
             for (let x = 0; x < 5; x++) {
@@ -84,9 +237,26 @@ class StationManager {
                     cell.classList.add('built');
                     const module = this.modules[moduleType];
                     if (module) {
+                        const tier = module.tier || 1;
+                        cell.dataset.tier = tier;
+                        
+                        let tierDisplay = '';
+                        if (tier > 1) {
+                            tierDisplay = `<span class="tier-indicator">T${tier}</span>`;
+                        }
+                        
+                        // Check for adjacency bonus
+                        const adjacencyBonus = this.adjacencyBonuses.get(`${x},${y}`);
+                        let efficiencyDisplay = '';
+                        if (adjacencyBonus) {
+                            const bonusPercent = Math.round((adjacencyBonus.multiplier - 1) * 100);
+                            efficiencyDisplay = `<div class="efficiency-badge">+${bonusPercent}%</div>`;
+                        }
+                        
                         cell.innerHTML = `
                             <div class="module-icon">${module.icon}</div>
-                            <div class="module-name">${module.name}</div>
+                            <div class="module-name">${module.name} ${tierDisplay}</div>
+                            ${efficiencyDisplay}
                         `;
                     }
                 } else if (this.canBuildAt(x, y, grid)) {
@@ -112,28 +282,106 @@ class StationManager {
             const item = document.createElement('div');
             item.className = 'module-item';
             
-            const canAfford = totalResources >= module.cost;
-            const alreadyBuilt = module.built || Object.values(grid).includes(key);
+            const currentTier = module.tier || 1;
+            const currentCost = Array.isArray(module.cost) ? module.cost[currentTier - 1] : module.cost;
+            const nextTierCost = Array.isArray(module.cost) ? module.cost[currentTier] : null;
             
-            if (!canAfford || alreadyBuilt) {
+            const canAfford = totalResources >= currentCost;
+            const alreadyBuilt = module.built || Object.values(grid).includes(key);
+            const canUpgrade = alreadyBuilt && currentTier < 3 && nextTierCost && totalResources >= nextTierCost;
+            
+            if (!canAfford && !alreadyBuilt) {
                 item.classList.add('unavailable');
             }
             
+            if (canUpgrade) {
+                item.classList.add('upgradeable');
+            }
+            
+            // Tier indicator
+            let tierDisplay = '';
+            if (currentTier > 1) {
+                tierDisplay = `<span class="tier-indicator">T${currentTier}</span>`;
+            }
+            
+            // Cost/action text with better styling
+            let actionText = '';
+            let costClass = '';
+            if (!alreadyBuilt) {
+                actionText = `${currentCost}💎`;
+                costClass = canAfford ? 'affordable' : 'expensive';
+            } else if (canUpgrade) {
+                actionText = `⬆ ${nextTierCost}💎`;
+                costClass = 'affordable';
+            } else if (currentTier >= 3) {
+                actionText = 'MAX';
+                costClass = 'max';
+            } else {
+                actionText = 'Built';
+                costClass = 'built';
+            }
+            
             item.innerHTML = `
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span>${module.icon} ${module.name}</span>
-                    <span style="color: ${canAfford ? '#4CAF50' : '#f44336'};">
-                        ${alreadyBuilt ? 'Built' : `${module.cost}💎`}
-                    </span>
+                <div class="module-header">
+                    <div class="module-title">
+                        <span>${module.icon}</span>
+                        <span>${module.name}</span>
+                        ${tierDisplay}
+                    </div>
+                    <div class="module-cost ${costClass}">
+                        ${actionText}
+                    </div>
+                </div>
+                <div class="module-benefits">
+                    ${module.benefits ? module.benefits[currentTier - 1] : ''}
                 </div>
             `;
             
-            if (canAfford && !alreadyBuilt) {
-                item.addEventListener('click', () => this.selectModule(key));
+            if ((canAfford && !alreadyBuilt) || canUpgrade) {
+                item.addEventListener('click', () => {
+                    if (canUpgrade) {
+                        const upgradeCost = this.upgradeModule(key, totalResources, grid);
+                        if (upgradeCost && window.game) {
+                            // Deduct resources from game
+                            window.game.totalResources -= upgradeCost;
+                            
+                            // Save the updated resources
+                            try {
+                                localStorage.setItem('totalResources', window.game.totalResources.toString());
+                            } catch (e) {
+                                console.warn('Failed to save resources:', e);
+                            }
+                            
+                            // Update ship capabilities with new tier
+                            this.updateShipCapabilities(window.game);
+                            
+                            // Refresh all displays
+                            this.populateModuleList(window.game.totalResources, grid);
+                            this.updateStationDisplay(window.game.totalResources, window.game.station);
+                            this.createStationGrid(grid, window.game);
+                        }
+                    } else {
+                        this.selectModule(key);
+                    }
+                });
             }
             
             moduleList.appendChild(item);
         });
+        
+        // Add adjacency bonus display
+        this.updateAdjacencyDisplay(grid);
+        
+        // Update module count
+        this.updateModuleCount(grid);
+    }
+
+    updateModuleCount(grid) {
+        const moduleCount = document.getElementById('moduleCount');
+        if (moduleCount) {
+            const count = Object.keys(grid).length;
+            moduleCount.textContent = count;
+        }
     }
 
     selectModule(moduleKey) {
@@ -172,11 +420,17 @@ class StationManager {
         if (!this.canBuildAt(x, y, game.station.grid)) return;
         
         const module = this.modules[this.selectedModule];
-        if (!module || game.totalResources < module.cost) return;
+        if (!module) return;
+        
+        // Get the current tier cost (for new building)
+        const currentTier = module.tier || 1;
+        const buildCost = Array.isArray(module.cost) ? module.cost[0] : module.cost; // Always use tier 1 cost for new buildings
+        
+        if (game.totalResources < buildCost) return;
         
         // Build the module
         game.station.grid[`${x},${y}`] = this.selectedModule;
-        game.totalResources -= module.cost;
+        game.totalResources -= buildCost;
         module.built = true;
         
         // Update station stats
@@ -222,7 +476,8 @@ class StationManager {
             Object.entries(this.modules).forEach(([key, module]) => {
                 moduleStates[key] = {
                     built: module.built,
-                    unlocked: module.unlocked
+                    unlocked: module.unlocked,
+                    tier: module.tier || 1
                 };
             });
             localStorage.setItem('moduleStates', JSON.stringify(moduleStates));
@@ -240,6 +495,7 @@ class StationManager {
                     if (this.modules[key]) {
                         this.modules[key].built = state.built || false;
                         this.modules[key].unlocked = state.unlocked || this.modules[key].unlocked;
+                        this.modules[key].tier = state.tier || 1;
                     }
                 });
             }
@@ -252,60 +508,252 @@ class StationManager {
         if (!this.modules) return;
         
         // Reset to base values first
-        game.ship.maxCargo = 4; // Reduced base capacity
-        game.laser.power = 1.5; // Increased base power  
-        game.ship.maxFuel = 80; // Reduced base fuel
+        game.ship.maxCargo = 6; // Slightly higher base capacity
+        game.laser.power = 1.5; // Base power  
+        game.ship.maxFuel = 120; // Generous base fuel to prevent softlocks
         
-        // Storage Bay increases cargo capacity significantly
-        if (this.modules.storage && this.modules.storage.built) {
-            game.ship.maxCargo = 8; // Doubled capacity upgrade
+        // Initialize additional capabilities
+        if (!game.ship.fuelEfficiency) game.ship.fuelEfficiency = 1;
+        if (!game.scanner) game.scanner = { speed: 8, maxRadius: 200, artifactDetection: 1 };
+        if (!game.research) game.research = { speed: 1 };
+        if (!game.automation) game.automation = { level: 0 };
+        
+        // Station tier bonuses
+        const stationTier = this.calculateStationTier(game.station.grid);
+        const tierMultiplier = 1 + (stationTier - 1) * 0.1; // 10% bonus per tier above 1
+        
+        // Calculate total station tier bonus from all modules
+        let totalStationTierBonus = 0;
+        
+        // Calculate capabilities based on built modules and their tiers
+        Object.keys(game.station.grid).forEach(pos => {
+            const moduleType = game.station.grid[pos];
+            const module = this.modules[moduleType];
+            if (!module || !module.built) return;
+            
+            const tier = module.tier || 1;
+            const efficiency = this.getModuleEfficiency(moduleType, pos, game.station.grid);
+            
+            // Add station tier bonus
+            if (module.stationTierBonus) {
+                totalStationTierBonus += module.stationTierBonus[tier - 1] * efficiency;
+            }
+            
+            switch (moduleType) {
+                case 'storage':
+                    // Storage increases cargo capacity based on tier and efficiency
+                    const cargoIncrease = [4, 8, 16][tier - 1] || 4;
+                    game.ship.maxCargo += Math.floor(cargoIncrease * efficiency * tierMultiplier);
+                    break;
+                    
+                case 'workshop':
+                    // Workshop increases mining power based on tier and efficiency
+                    const powerIncrease = [2, 4, 8][tier - 1] || 2;
+                    const miningBonus = module.miningBonus[tier - 1] || 0.5;
+                    game.laser.power += (powerIncrease + miningBonus) * efficiency * tierMultiplier;
+                    break;
+                    
+                case 'greenhouse':
+                    // Greenhouse increases fuel capacity and efficiency
+                    const fuelIncrease = module.fuelBonus[tier - 1] || 20;
+                    game.ship.maxFuel += Math.floor(fuelIncrease * efficiency * tierMultiplier);
+                    
+                    // Higher tiers improve fuel efficiency and regeneration
+                    if (tier >= 2) {
+                        game.ship.fuelEfficiency *= module.efficiency[tier - 1] * efficiency;
+                    }
+                    if (tier >= 3 && module.fuelRegen[tier - 1] > 0) {
+                        game.ship.fuelRegenRate = module.fuelRegen[tier - 1] * efficiency;
+                    }
+                    break;
+                    
+                case 'garden':
+                    // Garden provides bio-resource bonuses and crew comfort
+                    const comfortBonus = module.comfortBonus[tier - 1] || 0.1;
+                    const bioMultiplier = module.bioResourceMultiplier[tier - 1] || 1.2;
+                    
+                    // Garden improves overall station efficiency
+                    game.garden = {
+                        comfortBonus: comfortBonus * efficiency,
+                        bioMultiplier: bioMultiplier * efficiency,
+                        tier: tier
+                    };
+                    break;
+                    
+                case 'observatory':
+                    // Observatory improves scanner capabilities
+                    const scanBonus = module.scanBonus[tier - 1] || 1.25;
+                    game.scanner.speed = Math.floor(12 * scanBonus * efficiency * tierMultiplier);
+                    game.scanner.maxRadius = Math.floor(300 * scanBonus * efficiency * tierMultiplier);
+                    
+                    // Higher tiers improve artifact detection
+                    if (tier >= 2) {
+                        game.scanner.artifactDetection = module.artifactDetection[tier - 1] * efficiency;
+                    }
+                    
+                    // Field discovery bonus for deeper exploration
+                    if (module.fieldDiscoveryBonus && module.fieldDiscoveryBonus[tier - 1] > 0) {
+                        game.scanner.fieldDiscoveryBonus = module.fieldDiscoveryBonus[tier - 1] * efficiency;
+                    }
+                    break;
+                    
+                case 'factory':
+                    // Factory provides automation and resource processing
+                    const resourceMultiplier = module.resourceMultiplier[tier - 1] || 1.1;
+                    const automationLevel = module.automationLevel[tier - 1] || 0.1;
+                    
+                    game.factory = {
+                        resourceMultiplier: resourceMultiplier * efficiency,
+                        automationLevel: automationLevel * efficiency,
+                        tier: tier
+                    };
+                    break;
+                    
+                case 'research':
+                    // Research lab improves artifact analysis speed
+                    const researchSpeed = module.researchSpeed[tier - 1] || 1;
+                    const artifactBonus = module.artifactBonus[tier - 1] || 1;
+                    game.research.speed = researchSpeed * efficiency * tierMultiplier;
+                    game.research.artifactBonus = artifactBonus * efficiency;
+                    break;
+                    
+                case 'quarters':
+                    // Quarters provide automation bonuses and crew efficiency
+                    const automation = module.automation[tier - 1] || 0;
+                    const efficiencyBonus = module.efficiencyBonus[tier - 1] || 0.05;
+                    game.automation.level += automation * efficiency;
+                    game.automation.efficiencyBonus = efficiencyBonus * efficiency;
+                    break;
+                    
+                case 'reactor':
+                    // Reactor provides power and station-wide bonuses
+                    const powerOutput = module.powerOutput[tier - 1] || 1;
+                    const stationWideBonus = module.stationWideBonus[tier - 1] || 0.05;
+                    
+                    game.reactor = {
+                        powerOutput: powerOutput * efficiency,
+                        stationWideBonus: stationWideBonus * efficiency,
+                        tier: tier
+                    };
+                    break;
+                    
+                case 'vault':
+                    // Vault enhances Master Artifact bonuses
+                    const masterBonus = module.masterArtifactBonus[tier - 1] || 1;
+                    const cosmicEfficiency = module.cosmicEfficiency[tier - 1] || 1;
+                    game.masterArtifactBonus = masterBonus * efficiency;
+                    game.vault = {
+                        cosmicEfficiency: cosmicEfficiency * efficiency,
+                        tier: tier
+                    };
+                    break;
+            }
+        });
+        
+        // Apply reactor station-wide bonus if present
+        if (game.reactor && game.reactor.stationWideBonus > 0) {
+            const reactorBonus = 1 + game.reactor.stationWideBonus;
+            game.ship.maxCargo = Math.floor(game.ship.maxCargo * reactorBonus);
+            game.laser.power *= reactorBonus;
+            game.ship.maxFuel = Math.floor(game.ship.maxFuel * reactorBonus);
         }
         
-        // Workshop increases mining power substantially
-        if (this.modules.workshop && this.modules.workshop.built) {
-            game.laser.power = 3.5; // Much more impactful upgrade
+        // Apply garden comfort bonus to all systems
+        if (game.garden && game.garden.comfortBonus > 0) {
+            const comfortBonus = 1 + game.garden.comfortBonus;
+            game.ship.fuelEfficiency *= comfortBonus;
+            if (game.scanner) game.scanner.speed = Math.floor(game.scanner.speed * comfortBonus);
         }
         
-        // Greenhouse provides fuel efficiency AND capacity
-        if (this.modules.greenhouse && this.modules.greenhouse.built) {
-            game.ship.maxFuel = 150; // More meaningful fuel upgrade
+        // Apply automation efficiency bonus
+        if (game.automation && game.automation.efficiencyBonus > 0) {
+            const autoBonus = 1 + game.automation.efficiencyBonus;
+            game.laser.power *= autoBonus;
         }
         
-        // Observatory adds scanner efficiency (new bonus)
-        if (this.modules.observatory && this.modules.observatory.built) {
-            game.scanner.speed = 12; // Faster scanner
-            game.scanner.maxRadius = 300; // Larger range
+        // Apply total station tier bonus as resources
+        if (totalStationTierBonus > 0) {
+            game.stationTierResourceBonus = Math.floor(totalStationTierBonus);
+        }
+        
+        // Ensure minimum values
+        game.ship.maxCargo = Math.max(4, Math.floor(game.ship.maxCargo));
+        game.laser.power = Math.max(1.5, game.laser.power);
+        game.ship.maxFuel = Math.max(80, Math.floor(game.ship.maxFuel));
+        
+        // Cap current fuel if it exceeds new max
+        if (game.ship.fuel > game.ship.maxFuel) {
+            game.ship.fuel = game.ship.maxFuel;
         }
     }
 
     unlockModules(station, resourceManager = null) {
         if (!this.modules) return;
         
-        // Research Lab should always be unlocked if you have resources
+        // Basic modules always unlocked
+        this.modules.storage.unlocked = true;
         this.modules.research.unlocked = true;
         
-        // Unlock workshop after building storage and research
-        if (this.modules.storage.built && this.modules.research.built) {
+        // Unlock greenhouse early for fuel management
+        this.modules.greenhouse.unlocked = true;
+        
+        // Get station size and tier for unlock conditions
+        const stationSize = station && station.grid ? Object.keys(station.grid).length : 1;
+        const stationTier = this.calculateStationTier(station.grid);
+        
+        // Unlock workshop after building storage OR research (not both)
+        if (this.modules.storage.built || this.modules.research.built) {
             this.modules.workshop.unlocked = true;
         }
         
-        // Unlock advanced modules after workshop
+        // Unlock garden and observatory after workshop
         if (this.modules.workshop.built) {
-            this.modules.greenhouse.unlocked = true;
+            this.modules.garden.unlocked = true;
             this.modules.observatory.unlocked = true;
         }
         
-        // Unlock guest quarters after having 6+ modules
-        if (station && station.grid && Object.keys(station.grid).length >= 6) {
+        // Unlock factory after having workshop + storage (automation requires infrastructure)
+        if (this.modules.workshop.built && this.modules.storage.built && stationSize >= 4) {
+            this.modules.factory.unlocked = true;
+        }
+        
+        // Unlock quarters after having 5+ modules (crew needs living space)
+        if (stationSize >= 5) {
             this.modules.quarters.unlocked = true;
         }
         
-        // Master Vault: Requires all 5 Master Artifacts
-        if (resourceManager) {
-            const masterStatus = resourceManager.getMasterArtifactStatus();
-            if (masterStatus.collected === 5) {
-                this.modules.vault.unlocked = true;
+        // Unlock reactor after having workshop + observatory (power grid needs advanced tech)
+        if (this.modules.workshop.built && this.modules.observatory.built && stationSize >= 6) {
+            this.modules.reactor.unlocked = true;
+        }
+        
+        // Master Vault: Requires research lab + observatory + station tier 3+
+        if (this.modules.research.built && this.modules.observatory.built && stationTier >= 3) {
+            // Also check if we have any Master Artifacts
+            if (resourceManager) {
+                const masterStatus = resourceManager.getMasterArtifactStatus();
+                if (masterStatus.collected >= 1 || masterStatus.total >= 3) {
+                    this.modules.vault.unlocked = true;
+                }
+            } else {
+                this.modules.vault.unlocked = true; // Fallback if no resource manager
             }
+        }
+        
+        // Provide feedback when new modules are unlocked
+        const newlyUnlocked = [];
+        Object.entries(this.modules).forEach(([key, module]) => {
+            if (module.unlocked && !module.built && !module.notificationShown) {
+                newlyUnlocked.push(module.name);
+                module.notificationShown = true;
+            }
+        });
+        
+        if (newlyUnlocked.length > 0 && window.game && window.game.ui) {
+            window.game.ui.showNotification(
+                `🔓 New modules unlocked: ${newlyUnlocked.join(', ')}!`,
+                'success'
+            );
         }
     }
 
@@ -313,11 +761,235 @@ class StationManager {
         const resourceEl = document.getElementById('stationResourceCount');
         const gridSizeEl = document.getElementById('gridSize');
         const tierEl = document.getElementById('stationTier');
+        const tierDisplayEl = document.getElementById('stationTierDisplay');
         
+        // Update basic info
         if (resourceEl) resourceEl.textContent = totalResources;
         if (gridSizeEl && station) gridSizeEl.textContent = `${station.size}x${station.size}`;
         if (tierEl && station) tierEl.textContent = station.tier;
+        if (tierDisplayEl && station) tierDisplayEl.textContent = station.tier;
         
+        // Update station capabilities display
+        this.updateCapabilitiesDisplay();
+        
+        // Update storage info
+        this.updateStorageDisplay(station);
+        
+        // Unlock modules based on current state
         this.unlockModules(station);
+    }
+    
+    updateCapabilitiesDisplay() {
+        if (!window.game) return;
+        
+        const cargoEl = document.getElementById('cargoCapability');
+        const laserEl = document.getElementById('laserCapability');
+        const fuelEl = document.getElementById('fuelCapability');
+        
+        if (cargoEl) cargoEl.textContent = window.game.ship.maxCargo;
+        if (laserEl) laserEl.textContent = `${window.game.laser.power.toFixed(1)}x`;
+        if (fuelEl) fuelEl.textContent = window.game.ship.maxFuel;
+        
+        // Update capabilities with color coding based on improvements
+        const baseCargo = 4, baseLaser = 1.5, baseFuel = 80;
+        
+        if (cargoEl && window.game.ship.maxCargo > baseCargo) {
+            cargoEl.style.color = '#4CAF50';
+            cargoEl.title = `+${window.game.ship.maxCargo - baseCargo} from modules`;
+        }
+        
+        if (laserEl && window.game.laser.power > baseLaser) {
+            laserEl.style.color = '#4CAF50';
+            laserEl.title = `+${(window.game.laser.power - baseLaser).toFixed(1)} from modules`;
+        }
+        
+        if (fuelEl && window.game.ship.maxFuel > baseFuel) {
+            fuelEl.style.color = '#4CAF50';
+            fuelEl.title = `+${window.game.ship.maxFuel - baseFuel} from modules`;
+        }
+    }
+    
+    updateStorageDisplay(station) {
+        if (!station || !station.grid) return;
+        
+        const storageInfo = this.calculateStorageCapacity(station.grid);
+        
+        // You could add a storage display element here
+        // For now, we'll just store the info for potential use
+        this.currentStorageInfo = storageInfo;
+    }
+
+    upgradeModule(moduleKey, totalResources, grid) {
+        const module = this.modules[moduleKey];
+        if (!module || !module.built) return false;
+        
+        const currentTier = module.tier || 1;
+        if (currentTier >= 3) return false;
+        
+        const upgradeCost = Array.isArray(module.cost) ? module.cost[currentTier] : null;
+        if (!upgradeCost || totalResources < upgradeCost) return false;
+        
+        // Perform upgrade
+        module.tier = currentTier + 1;
+        this.saveModuleStates();
+        
+        // Create a notification about the upgrade
+        if (window.game && window.game.ui) {
+            window.game.ui.showNotification(`🔧 ${module.name} upgraded to Tier ${module.tier}!`, 'epic');
+        }
+        
+        // Return the cost for the game to deduct
+        return upgradeCost;
+    }
+
+    calculateAdjacencyBonuses(grid) {
+        this.adjacencyBonuses.clear();
+        
+        const adjacencyRules = {
+            research: ['observatory', 'vault', 'factory'], // Research + Observatory/Vault/Factory = faster analysis
+            workshop: ['storage', 'greenhouse', 'factory'], // Workshop + Storage/Greenhouse/Factory = efficiency boost
+            greenhouse: ['observatory', 'research', 'garden'], // Greenhouse + Observatory/Research/Garden = fuel efficiency
+            garden: ['greenhouse', 'quarters', 'research'], // Garden + Greenhouse/Quarters/Research = bio bonuses
+            storage: ['workshop', 'command', 'factory'], // Storage + Workshop/Command/Factory = capacity boost
+            observatory: ['research', 'vault', 'reactor'], // Observatory + Research/Vault/Reactor = enhanced scanning
+            factory: ['workshop', 'storage', 'reactor'], // Factory + Workshop/Storage/Reactor = automation boost
+            quarters: ['garden', 'reactor'], // Quarters + Garden/Reactor = crew efficiency
+            reactor: ['*'], // Reactor provides power bonus to all adjacent modules
+            vault: ['research', 'observatory', 'reactor'] // Vault + Research/Observatory/Reactor = artifact bonuses
+        };
+        
+        Object.keys(grid).forEach(pos => {
+            const [x, y] = pos.split(',').map(Number);
+            const moduleType = grid[pos];
+            const module = this.modules[moduleType];
+            
+            if (!module || !adjacencyRules[moduleType]) return;
+            
+            const adjacent = [
+                [x-1, y], [x+1, y], [x, y-1], [x, y+1]
+            ];
+            
+            let bonusMultiplier = 1;
+            let bonusDescription = [];
+            
+            adjacent.forEach(([ax, ay]) => {
+                const adjacentModule = grid[`${ax},${ay}`];
+                if (!adjacentModule) return;
+                
+                const rules = adjacencyRules[moduleType];
+                if (rules.includes(adjacentModule) || rules.includes('*')) {
+                    // Different modules provide different synergy bonuses
+                    let synergyBonus = 0.15; // Base 15%
+                    
+                    // Special synergy bonuses
+                    if (moduleType === 'reactor' || adjacentModule === 'reactor') {
+                        synergyBonus = 0.25; // Reactor provides 25% bonus
+                    } else if ((moduleType === 'research' && adjacentModule === 'vault') || 
+                               (moduleType === 'vault' && adjacentModule === 'research')) {
+                        synergyBonus = 0.3; // Research + Vault = 30% bonus
+                    } else if ((moduleType === 'workshop' && adjacentModule === 'factory') || 
+                               (moduleType === 'factory' && adjacentModule === 'workshop')) {
+                        synergyBonus = 0.2; // Workshop + Factory = 20% bonus
+                    }
+                    
+                    bonusMultiplier += synergyBonus;
+                    bonusDescription.push(this.modules[adjacentModule].name);
+                }
+            });
+            
+            if (bonusMultiplier > 1) {
+                this.adjacencyBonuses.set(pos, {
+                    multiplier: bonusMultiplier,
+                    description: `+${Math.round((bonusMultiplier - 1) * 100)}% efficiency from ${bonusDescription.join(', ')}`,
+                    modules: bonusDescription
+                });
+            }
+        });
+    }
+
+    updateAdjacencyDisplay(grid) {
+        this.calculateAdjacencyBonuses(grid);
+        
+        const adjacencyContainer = document.getElementById('adjacencyBonuses');
+        if (!adjacencyContainer) return;
+        
+        adjacencyContainer.innerHTML = '';
+        
+        if (this.adjacencyBonuses.size === 0) {
+            adjacencyContainer.innerHTML = '<div style="color: #666; text-align: center; padding: 10px;">No synergy bonuses active</div>';
+            return;
+        }
+        
+        this.adjacencyBonuses.forEach((bonus, pos) => {
+            const [x, y] = pos.split(',').map(Number);
+            const moduleType = grid[pos];
+            const module = this.modules[moduleType];
+            
+            const bonusItem = document.createElement('div');
+            bonusItem.className = 'adjacency-bonus';
+            bonusItem.innerHTML = `
+                <div class="bonus-header">
+                    <span>${module.icon} ${module.name}</span>
+                    <span class="bonus-value">+${Math.round((bonus.multiplier - 1) * 100)}%</span>
+                </div>
+                <div class="bonus-desc">
+                    Synergy with: ${bonus.modules.join(', ')}
+                </div>
+            `;
+            adjacencyContainer.appendChild(bonusItem);
+        });
+    }
+
+    getModuleEfficiency(moduleType, position, grid) {
+        const baseModule = this.modules[moduleType];
+        if (!baseModule) return 1;
+        
+        let efficiency = 1;
+        
+        // Tier bonus
+        const tier = baseModule.tier || 1;
+        if (baseModule.efficiency) {
+            efficiency *= baseModule.efficiency[tier - 1];
+        }
+        
+        // Adjacency bonus
+        const adjacencyBonus = this.adjacencyBonuses.get(position);
+        if (adjacencyBonus) {
+            efficiency *= adjacencyBonus.multiplier;
+        }
+        
+        return efficiency;
+    }
+
+    calculateStorageCapacity(grid) {
+        let baseCapacity = 50; // Starting capacity
+        let specializedStorage = {};
+        
+        Object.keys(grid).forEach(pos => {
+            const moduleType = grid[pos];
+            const module = this.modules[moduleType];
+            
+            if (moduleType === 'storage' && module) {
+                const tier = module.tier || 1;
+                const efficiency = this.getModuleEfficiency(moduleType, pos, grid);
+                
+                if (tier === 1) {
+                    baseCapacity += Math.floor(25 * efficiency);
+                } else if (tier === 2) {
+                    baseCapacity += Math.floor(50 * efficiency);
+                    // Tier 2 storage can sort basic vs precious materials
+                    specializedStorage.basic = true;
+                    specializedStorage.precious = true;
+                } else if (tier === 3) {
+                    baseCapacity += Math.floor(100 * efficiency);
+                    // Tier 3 storage can handle all resource types
+                    Object.keys(this.resourceTypes).forEach(type => {
+                        specializedStorage[type] = true;
+                    });
+                }
+            }
+        });
+        
+        return { capacity: baseCapacity, specialized: specializedStorage };
     }
 } 

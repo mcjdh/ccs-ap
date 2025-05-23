@@ -166,6 +166,7 @@ class UIManager {
         this.updateStationTier(game.station);
         this.updateExpeditionInfo(game);
         this.updateFuelWarnings(game.ship);
+        this.updateFuelNumbers(game.ship);
     }
 
     updateFuelBar(ship) {
@@ -181,9 +182,17 @@ class UIManager {
             } else if (fuelPercentage < 40) {
                 fuelFill.style.background = 'linear-gradient(90deg, #ff9800, #ffc107)'; // Orange caution
             } else {
-                fuelFill.style.background = 'linear-gradient(90deg, #4CAF50, #81C784)'; // Green normal
+                fuelFill.style.background = 'linear-gradient(90deg, #4CAF50, #66BB6A)'; // Green normal
             }
         }
+    }
+
+    updateFuelNumbers(ship) {
+        const fuelCurrent = document.getElementById('fuelCurrent');
+        const fuelMax = document.getElementById('fuelMax');
+        
+        if (fuelCurrent) fuelCurrent.textContent = Math.round(ship.fuel);
+        if (fuelMax) fuelMax.textContent = ship.maxFuel;
     }
 
     updateCargoBar(ship) {
@@ -192,6 +201,13 @@ class UIManager {
         
         if (cargoFill) {
             cargoFill.style.width = cargoPercentage + '%';
+            
+            // Dynamic cargo colors
+            if (cargoPercentage >= 90) {
+                cargoFill.style.background = 'linear-gradient(90deg, #ff9800, #ffc107)'; // Orange when nearly full
+            } else {
+                cargoFill.style.background = 'linear-gradient(90deg, #2196F3, #42A5F5)'; // Blue normal
+            }
         }
         
         if (document.getElementById('cargoCount')) {

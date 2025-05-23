@@ -9,63 +9,177 @@
 <body>
     <canvas id="gameCanvas"></canvas>
     
+    <!-- View Indicator -->
     <div class="view-indicator" id="viewIndicator">🚀 Mining Expedition</div>
     
+    <!-- Mining UI (Left Panel) -->
     <div class="ui" id="miningUI">
-        <div>⛽ Fuel</div>
+        <h3>🚀 Mission Control</h3>
+        
+        <div class="ui-stat">
+            <span class="ui-stat-label">⛽ Fuel</span>
+            <span class="ui-stat-value"><span id="fuelCurrent">120</span>/<span id="fuelMax">120</span></span>
+        </div>
         <div class="fuel-bar">
             <div class="fuel-fill" id="fuelFill"></div>
         </div>
-        <div>📦 Cargo: <span id="cargoCount">0</span>/<span id="cargoMax">6</span></div>
+        
+        <div class="ui-stat">
+            <span class="ui-stat-label">📦 Cargo</span>
+            <span class="ui-stat-value"><span id="cargoCount">0</span>/<span id="cargoMax">6</span></span>
+        </div>
         <div class="cargo-bar">
             <div class="cargo-fill" id="cargoFill"></div>
         </div>
-        <div>💎 Resources: <span id="resourceCount">0</span></div>
-        <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #333;">
-            <div>🏗️ Station Tier: <span id="stationTier">1</span></div>
+        
+        <div class="ui-stat">
+            <span class="ui-stat-label">💎 Resources</span>
+            <span class="ui-stat-value" id="resourceCount">0</span>
+        </div>
+        
+        <div class="ui-stat">
+            <span class="ui-stat-label">🏗️ Station Tier</span>
+            <span class="ui-stat-value" id="stationTier">1</span>
         </div>
     </div>
     
+    <!-- Station UI (Right Panel) -->
     <div class="station-ui" id="stationUI">
-        <h3>🏗️ Station Builder</h3>
-        <div>💎 Resources: <span id="stationResourceCount">0</span></div>
-        <div>📏 Grid Size: <span id="gridSize">1x1</span></div>
-        
-        <div class="module-list" id="moduleList">
-            <!-- Module options will be populated by JavaScript -->
-        </div>
-        
-        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #333;">
-            <div style="font-size: 12px; opacity: 0.8;">
-                Click a module above, then click an available (green) grid cell to build.
+        <!-- Station Header -->
+        <div class="station-header">
+            <h3>🏗️ Station Builder</h3>
+            
+            <div class="station-stats">
+                <div class="stat-box">
+                    <div class="label">💎 Resources</div>
+                    <div class="value" id="stationResourceCount">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="label">📏 Grid Size</div>
+                    <div class="value" id="gridSize">1x1</div>
+                </div>
+                <div class="stat-box">
+                    <div class="label">🎚️ Station Tier</div>
+                    <div class="value" id="stationTierDisplay">1</div>
+                </div>
+                <div class="stat-box">
+                    <div class="label">🏗️ Modules</div>
+                    <div class="value" id="moduleCount">1</div>
+                </div>
             </div>
         </div>
+        
+        <!-- Station Capabilities -->
+        <div class="capabilities-section">
+            <h4>📊 Ship Capabilities</h4>
+            <div class="capabilities-grid">
+                <div class="capability-item">
+                    <span class="icon">📦</span>
+                    <div class="value" id="cargoCapability">6</div>
+                </div>
+                <div class="capability-item">
+                    <span class="icon">⚡</span>
+                    <div class="value" id="laserCapability">1.5x</div>
+                </div>
+                <div class="capability-item">
+                    <span class="icon">⛽</span>
+                    <div class="value" id="fuelCapability">120</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Module List -->
+        <div class="modules-section">
+            <h4>🔧 Available Modules</h4>
+            <div class="module-list" id="moduleList">
+                <!-- Module options will be populated by JavaScript -->
+            </div>
+        </div>
+        
+        <!-- Station Synergies -->
+        <div class="synergies-section">
+            <h4>⚡ Station Synergies</h4>
+            <div class="adjacency-bonuses" id="adjacencyBonuses">
+                <div style="color: #666; text-align: center; padding: 10px;">No synergy bonuses active</div>
+            </div>
+        </div>
+        
+        <!-- Building Guide -->
+        <div class="building-guide">
+            <strong>Building Guide:</strong>
+            <ul>
+                <li>Click a module above, then click a green grid cell to build</li>
+                <li>Click built modules to upgrade (Tier 1 → 2 → 3)</li>
+                <li>Adjacent compatible modules provide synergy bonuses</li>
+                <li>Higher station tiers unlock new capabilities</li>
+            </ul>
+        </div>
+        
+        <!-- Reset Button -->
+        <div style="padding: 0 20px 20px 20px;">
+            <button id="resetProgressBtn" class="reset-button">🔄 Reset Progress</button>
+        </div>
     </div>
     
+    <!-- Station Grid (Center) -->
     <div class="station-grid" id="stationGrid">
         <!-- Grid will be populated by JavaScript -->
     </div>
     
+    <!-- Mining Controls (Bottom Right) -->
     <div class="controls" id="miningControls">
-        <div>🚀 WASD - Move Ship</div>
-        <div>🤖 Auto-Mining: ON (Press X to toggle)</div>
-        <div>⚡ Space - Scanner Pulse</div>
-        <div>🏠 R - Return to Station</div>
-        <div>📋 Tab - Station View</div>
-        <div style="opacity: 0.7; font-size: 12px;">Manual Mode: Mouse to aim & mine</div>
+        <h4>🎮 Controls</h4>
+        <div class="control-item">
+            <span class="control-key">WASD</span>
+            <span class="control-desc">Move Ship</span>
+        </div>
+        <div class="control-item">
+            <span class="control-key">Space</span>
+            <span class="control-desc">Scanner Pulse</span>
+        </div>
+        <div class="control-item">
+            <span class="control-key">R</span>
+            <span class="control-desc">Return to Station</span>
+        </div>
+        <div class="control-item">
+            <span class="control-key">Tab</span>
+            <span class="control-desc">Station View</span>
+        </div>
+        <div class="control-item">
+            <span class="control-key">X</span>
+            <span class="control-desc">Toggle Auto-Mining</span>
+        </div>
+        <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1); font-size: 11px; color: #b0bec5; text-align: center;">
+            Manual Mode: Mouse to aim & mine
+        </div>
     </div>
     
+    <!-- Station Controls (Bottom Right) -->
     <div class="controls" id="stationControls" style="display: none;">
-        <div>📋 Tab - Back to Mining</div>
-        <div>🔧 Click - Select Module</div>
-        <div>🏗️ Click Grid - Build Module</div>
-        <div>💎 Costs scale with tier</div>
+        <h4>🏗️ Station Controls</h4>
+        <div class="control-item">
+            <span class="control-key">Tab</span>
+            <span class="control-desc">Back to Mining</span>
+        </div>
+        <div class="control-item">
+            <span class="control-key">Click</span>
+            <span class="control-desc">Select Module</span>
+        </div>
+        <div class="control-item">
+            <span class="control-key">Grid</span>
+            <span class="control-desc">Build Module</span>
+        </div>
+        <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1); font-size: 11px; color: #b0bec5; text-align: center;">
+            💎 Costs scale with tier
+        </div>
     </div>
     
+    <!-- Title -->
     <div class="title" id="gameTitle">🌟 COSMIC COLLECTION STATION 🌟</div>
     
+    <!-- Auto-Mining Indicator -->
     <div class="auto-mining-indicator" id="autoMiningIndicator" style="display: none;">
-        🤖 AUTO-MINING
+        🤖 AUTO-MINING ACTIVE
     </div>
     
     <!-- Enhanced Modal Dialog -->
