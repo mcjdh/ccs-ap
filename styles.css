@@ -1057,88 +1057,83 @@ canvas {
 }
 
 @media (max-width: 768px) {
-    .station-ui {
-        width: 320px;
-        right: 10px;
-        top: 10px;
-        max-height: calc(100vh - 20px);
+    .ui, .station-ui {
+        font-size: 12px;
+        padding: 8px;
+        max-width: 250px;
     }
     
     .controls {
-        bottom: 10px;
-        right: 10px;
+        font-size: 10px;
+        padding: 8px;
+        bottom: 60px; /* Account for mobile browsers */
+    }
+    
+    .station-grid {
+        transform: scale(0.8);
+        transform-origin: center;
+    }
+    
+    .modal-content {
+        margin: 10% auto;
+        width: 90%;
+        max-width: 400px;
+        padding: 15px;
+    }
+    
+    .notification {
+        width: 90%;
+        left: 5%;
         font-size: 12px;
-        min-width: 180px;
     }
     
-    .ui {
-        left: 10px;
-        top: 10px;
-        min-width: 200px;
-        max-width: 240px;
+    /* Touch-friendly button sizes */
+    .module-item, .grid-cell {
+        min-height: 44px; /* Apple's recommended touch target */
+        touch-action: manipulation; /* Disable double-tap zoom */
     }
     
-    .notification-container {
-        right: 340px;
-        width: 240px;
-    }
-    
-    .grid-cell {
-        width: 65px;
-        height: 65px;
-        margin: 2px;
-    }
-    
-    .module-icon {
-        font-size: 24px;
-    }
-    
-    .view-indicator {
-        font-size: 12px;
-        padding: 10px 16px;
-    }
-    
-    .auto-mining-indicator {
-        font-size: 11px;
-        padding: 8px 14px;
+    /* Improved mobile canvas interaction */
+    canvas {
+        touch-action: none; /* Prevent default touch behaviors */
+        user-select: none;  /* Prevent text selection */
     }
 }
 
 @media (max-width: 480px) {
-    .station-ui {
-        width: calc(100vw - 20px);
-        right: 10px;
-        left: 10px;
+    .ui, .station-ui {
+        max-width: 200px;
+        font-size: 11px;
     }
     
-    .notification-container {
-        right: 10px;
-        left: 10px;
-        width: auto;
+    .view-indicator {
+        font-size: 14px;
+        padding: 8px 16px;
     }
     
-    .ui {
-        max-width: calc(100vw - 20px);
+    .station-grid {
+        transform: scale(0.7);
     }
     
     .controls {
-        min-width: calc(100vw - 20px);
-        left: 10px;
-        right: 10px;
+        bottom: 80px; /* More space for mobile browsers */
+        max-width: 150px;
+    }
+}
+
+/* Landscape mobile optimization */
+@media (max-height: 500px) and (orientation: landscape) {
+    .ui, .station-ui {
+        max-height: 80vh;
+        overflow-y: auto;
     }
     
-    .modal-content {
-        width: 95%;
-        margin: 5% auto;
-        padding: 20px;
+    .controls {
+        bottom: 10px;
+        max-height: 120px;
     }
     
-    .modal-buttons {
-        flex-direction: column;
-    }
-    
-    .modal-button {
-        min-width: auto;
-        width: 100%;
+    .view-indicator {
+        top: 5px;
     }
 } 

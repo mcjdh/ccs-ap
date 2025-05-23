@@ -416,58 +416,139 @@ class StationManager {
     }
 
     handleGridClick(x, y, game) {
-        if (!this.selectedModule) return;
-        if (!this.canBuildAt(x, y, game.station.grid)) return;
-        
-        const module = this.modules[this.selectedModule];
-        if (!module) return;
-        
-        // Get the current tier cost (for new building)
-        const currentTier = module.tier || 1;
-        const buildCost = Array.isArray(module.cost) ? module.cost[0] : module.cost; // Always use tier 1 cost for new buildings
-        
-        if (game.totalResources < buildCost) return;
-        
-        // Build the module
-        game.station.grid[`${x},${y}`] = this.selectedModule;
-        game.totalResources -= buildCost;
-        module.built = true;
-        
-        // Update station stats
-        game.station.size = this.calculateStationSize(game.station.grid);
-        game.station.tier = this.calculateStationTier(game.station.grid);
-        
-        // Save progress immediately
-        this.saveStationGrid(game.station.grid);
-        this.saveModuleStates();
         try {
-            localStorage.setItem('totalResources', game.totalResources.toString());
-        } catch (e) {
-            console.warn('Failed to save resources:', e);
+            const posKey = `${x},${y}`;
+            
+            // Validate coordinates are within bounds
+            if (x < 0 || x >= 5 || y < 0 || y >= 5) {
+                console.warn('Grid click outside valid bounds:', x, y);
+                return;
+            }
+            
+            // Check if cell is already occupied
+            if (game.station.grid[posKey]) {
+                const existingModule = game.station.grid[posKey];
+                const moduleData = this.modules[existingModule];
+                
+                if (!moduleData) {
+                    console.error('Invalid module data for:', existingModule);
+                    return;
+                }
+                
+                // Try to upgrade existing module
+                const upgraded = this.upgradeModule(existingModule, game.totalResources, game.station.grid);
+                if (upgraded.success) {
+                    game.totalResources = upgraded.newTotal;
+                    
+                    // Save progress
+                    try {
+                        localStorage.setItem('totalResources', game.totalResources.toString());
+                        this.saveModuleStates();
+                        this.saveStationGrid(game.station.grid);
+                    } catch (saveError) {
+                        console.warn('Failed to save upgrade progress:', saveError);
+                        game.ui.showNotification('⚠️ Upgrade saved locally but may not persist', 'warning', 4000);
+                    }
+                    
+                    game.ui.showNotification(upgraded.message, 'success', 4000);
+                    this.updateStationDisplay(game.totalResources, game.station);
+                    this.updateShipCapabilities(game);
+                } else {
+                    game.ui.showNotification(upgraded.message, 'warning', 3000);
+                }
+                return;
+            }
+            
+            // Check if we have a module selected for building
+            if (!game.station.selectedModule) {
+                game.ui.showNotification('Select a module first, then click a green cell to build', 'info', 3000);
+                return;
+            }
+            
+            // Validate the selected module exists
+            const moduleType = game.station.selectedModule;
+            const moduleData = this.modules[moduleType];
+            
+            if (!moduleData) {
+                console.error('Invalid selected module:', moduleType);
+                game.station.selectedModule = null;
+                this.updateStationDisplay(game.totalResources, game.station);
+                return;
+            }
+            
+            // Check if module is unlocked
+            if (!moduleData.unlocked) {
+                game.ui.showNotification(`${moduleData.name} is not yet unlocked`, 'warning', 3000);
+                return;
+            }
+            
+            // Check if we can build at this location
+            if (!this.canBuildAt(x, y, game.station.grid)) {
+                game.ui.showNotification('Cannot build here - must be adjacent to existing modules', 'warning', 3000);
+                return;
+            }
+            
+            // Check resource cost
+            const cost = moduleData.cost[moduleData.tier - 1] || moduleData.cost[0];
+            if (game.totalResources < cost) {
+                game.ui.showNotification(
+                    `Need ${cost} resources to build ${moduleData.name} (have ${game.totalResources})`, 
+                    'warning', 
+                    4000
+                );
+                return;
+            }
+            
+            // All checks passed - build the module
+            game.station.grid[posKey] = moduleType;
+            game.totalResources -= cost;
+            moduleData.built = true;
+            
+            // Update station stats
+            game.station.size = this.calculateStationSize(game.station.grid);
+            game.station.tier = this.calculateStationTier(game.station.grid);
+            
+            // Clear selection
+            game.station.selectedModule = null;
+            
+            // Save progress with error handling
+            try {
+                localStorage.setItem('totalResources', game.totalResources.toString());
+                this.saveModuleStates();
+                this.saveStationGrid(game.station.grid);
+            } catch (saveError) {
+                console.warn('Failed to save building progress:', saveError);
+                game.ui.showNotification('⚠️ Module built but save failed - progress may be lost', 'warning', 5000);
+            }
+            
+            // Update displays and capabilities
+            this.updateStationDisplay(game.totalResources, game.station);
+            this.updateShipCapabilities(game);
+            this.unlockModules(game.station, game.resourceManager);
+            
+            // Success notification
+            game.ui.showNotification(
+                `✅ Built ${moduleData.name}! Station tier: ${game.station.tier}`, 
+                'success', 
+                4000
+            );
+            
+            console.log('Module built successfully:', {
+                module: moduleData.name,
+                position: posKey,
+                cost: cost,
+                remainingResources: game.totalResources,
+                stationTier: game.station.tier
+            });
+            
+        } catch (error) {
+            console.error('Error in handleGridClick:', error);
+            game.ui.showNotification('🚨 Building error - please try again', 'error', 4000);
+            
+            // Reset selection to prevent stuck state
+            game.station.selectedModule = null;
+            this.updateStationDisplay(game.totalResources, game.station);
         }
-        
-        // Update ship capabilities first
-        this.updateShipCapabilities(game);
-        
-        // Unlock new modules based on what was built
-        this.unlockModules(game.station, game.resourceManager);
-        
-        // Update all displays
-        this.createStationGrid(game.station.grid, game);
-        this.populateModuleList(game.totalResources, game.station.grid);
-        this.updateStationDisplay(game.totalResources, game.station);
-        
-        // Clear selection
-        this.selectedModule = null;
-        document.querySelectorAll('.module-item').forEach(item => {
-            item.classList.remove('selected');
-        });
-        
-        console.log('Built module:', this.selectedModule, 'New capabilities:', {
-            maxCargo: game.ship.maxCargo,
-            laserPower: game.laser.power,
-            maxFuel: game.ship.maxFuel
-        });
     }
 
     saveModuleStates() {

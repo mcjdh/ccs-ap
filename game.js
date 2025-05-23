@@ -136,8 +136,13 @@ class CosmicCollectionStation {
     }
     
     setupEventListeners() {
-        // Keyboard
+        // Enhanced keyboard handling with conflict prevention
         window.addEventListener('keydown', (e) => {
+            // Prevent handling when modal is open
+            if (document.getElementById('gameModal').style.display === 'flex') {
+                return;
+            }
+            
             this.keys[e.key.toLowerCase()] = true;
             
             if (e.key === ' ') {
@@ -148,6 +153,7 @@ class CosmicCollectionStation {
             }
             
             if (e.key.toLowerCase() === 'r' && this.gameState === 'mining') {
+                e.preventDefault(); // Prevent browser refresh
                 this.returnToStation();
             }
             
@@ -157,6 +163,7 @@ class CosmicCollectionStation {
             }
             
             if (e.key.toLowerCase() === 'x' && this.gameState === 'mining') {
+                e.preventDefault();
                 this.toggleAutoMining();
             }
             
@@ -181,7 +188,7 @@ class CosmicCollectionStation {
             this.keys[e.key.toLowerCase()] = false;
         });
         
-        // Mouse for mining (when auto-mining disabled)
+        // Enhanced mouse handling for mining
         this.canvas.addEventListener('mousemove', (e) => {
             const rect = this.canvas.getBoundingClientRect();
             this.mouse.x = e.clientX - rect.left;
@@ -190,19 +197,71 @@ class CosmicCollectionStation {
         
         this.canvas.addEventListener('mousedown', (e) => {
             if (this.gameState === 'mining' && !this.autoMining.enabled) {
+                e.preventDefault(); // Prevent context menu or other issues
                 this.mouse.down = true;
                 this.startMining();
             }
         });
         
-        this.canvas.addEventListener('mouseup', () => {
+        this.canvas.addEventListener('mouseup', (e) => {
+            e.preventDefault();
             this.mouse.down = false;
             this.stopMining();
         });
         
-        // Resize
+        // Prevent right-click context menu on canvas
+        this.canvas.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+        });
+        
+        // Mobile touch controls
+        this.canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const rect = this.canvas.getBoundingClientRect();
+            this.mouse.x = touch.clientX - rect.left;
+            this.mouse.y = touch.clientY - rect.top;
+            
+            if (this.gameState === 'mining') {
+                // Touch to activate scanner (like spacebar)
+                this.activateScanner();
+                
+                // If auto-mining is disabled, start mining at touch location
+                if (!this.autoMining.enabled) {
+                    this.mouse.down = true;
+                    this.startMining();
+                }
+            }
+        });
+        
+        this.canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const rect = this.canvas.getBoundingClientRect();
+            this.mouse.x = touch.clientX - rect.left;
+            this.mouse.y = touch.clientY - rect.top;
+        });
+        
+        this.canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            this.mouse.down = false;
+            this.stopMining();
+        });
+        
+        // Handle window resize to maintain responsive design
         window.addEventListener('resize', () => {
             this.setupCanvas();
+        });
+        
+        // Handle visibility change to pause/resume game
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                // Game is hidden, could pause here if needed
+                console.log('Game paused (tab hidden)');
+            } else {
+                // Game is visible again
+                console.log('Game resumed (tab visible)');
+            }
         });
         
         // Reset progress button
@@ -301,12 +360,91 @@ class CosmicCollectionStation {
     }
     
     generateAsteroids() {
-        this.asteroids = this.resourceManager.generateFieldAsteroids(
-            this.expedition.currentField, 
-            this.canvas.width, 
-            this.canvas.height
-        );
-        this.artifacts = []; // Clear current field artifacts
+        this.asteroids = [];
+        this.resources = [];
+        this.artifacts = [];
+        
+        // Progressive field difficulty with enhanced balance
+        const baseCount = 8;
+        const fieldMultiplier = Math.min(this.expedition.currentField * 0.3, 1.5); // Cap at 1.5x
+        const asteroidCount = Math.max(6, Math.floor(baseCount + fieldMultiplier * 4)); // Minimum 6 asteroids
+        
+        // Enhanced rare asteroid spawning with progression
+        const rareChance = Math.min(0.15 + (this.expedition.currentField - 1) * 0.05, 0.4); // 15% to 35%
+        
+        for (let i = 0; i < asteroidCount; i++) {
+            // Ensure asteroids don't spawn too close to ship starting position
+            let x, y, attempts = 0;
+            const shipStartX = this.canvas.width / 2;
+            const shipStartY = this.canvas.height / 2;
+            
+            do {
+                x = Math.random() * this.canvas.width;
+                y = Math.random() * this.canvas.height;
+                attempts++;
+                
+                // Prevent infinite loop
+                if (attempts > 20) break;
+                
+                const distanceFromShip = Math.sqrt(
+                    (x - shipStartX) ** 2 + (y - shipStartY) ** 2
+                );
+                
+                // Ensure minimum distance from ship spawn
+                if (distanceFromShip > 100) break;
+                
+            } while (true);
+            
+            const isRare = Math.random() < rareChance;
+            const baseSize = 15 + Math.random() * 10;
+            const size = isRare ? baseSize * 1.3 : baseSize;
+            const baseHealth = isRare ? 4 : 3;
+            const health = baseHealth + Math.floor(this.expedition.currentField / 2);
+            
+            this.asteroids.push({
+                x: x,
+                y: y,
+                size: size,
+                health: health,
+                maxHealth: health,
+                type: isRare ? 'rare' : 'normal',
+                resources: isRare ? 3 + Math.floor(Math.random() * 3) : 1 + Math.floor(Math.random() * 2),
+                rotation: 0,
+                rotationSpeed: (Math.random() - 0.5) * 0.02
+            });
+        }
+        
+        // Ensure at least one valuable asteroid per field
+        if (this.asteroids.filter(a => a.type === 'rare').length === 0 && this.asteroids.length > 3) {
+            const randomIndex = Math.floor(Math.random() * this.asteroids.length);
+            this.asteroids[randomIndex].type = 'rare';
+            this.asteroids[randomIndex].resources = 3 + Math.floor(Math.random() * 3);
+            this.asteroids[randomIndex].size *= 1.3;
+        }
+        
+        // Enhanced artifact spawning with better progression
+        this.spawnArtifact();
+        
+        // Auto-scan if artifacts are present and ship has observatory
+        const hasObservatory = Object.values(this.station.grid).includes('observatory');
+        if (this.artifacts.length > 0 && hasObservatory) {
+            setTimeout(() => {
+                this.activateScanner();
+                this.ui.showNotification('🔭 Observatory detected anomalies - auto-scanning...', 'info', 3000);
+            }, 1500);
+        }
+        
+        console.log(`Field ${this.expedition.currentField} generated:`, {
+            asteroids: this.asteroids.length,
+            rareAsteroids: this.asteroids.filter(a => a.type === 'rare').length,
+            artifacts: this.artifacts.length,
+            expectedRareChance: `${(rareChance * 100).toFixed(1)}%`
+        });
+    }
+    
+    spawnArtifact() {
+        // Clear existing artifacts for this field
+        this.artifacts = [];
         
         // Track fields visited for Master Artifact conditions
         this.resourceManager.updatePlayerStats({
@@ -315,7 +453,31 @@ class CosmicCollectionStation {
         
         // Generate regular artifacts using ResourceManager
         if (this.resourceManager.shouldSpawnArtifact(this.expedition.currentField)) {
-            this.spawnArtifact();
+            const artifact = this.resourceManager.generateArtifact(this.expedition.currentField);
+            if (artifact) {
+                // Position artifact randomly but not too close to ship spawn
+                let x, y, attempts = 0;
+                do {
+                    x = Math.random() * this.canvas.width;
+                    y = Math.random() * this.canvas.height;
+                    attempts++;
+                    
+                    if (attempts > 20) break;
+                    
+                    const distanceFromShip = Math.sqrt(
+                        (x - this.canvas.width/2) ** 2 + (y - this.canvas.height/2) ** 2
+                    );
+                    
+                    if (distanceFromShip > 120) break;
+                } while (true);
+                
+                artifact.x = x;
+                artifact.y = y;
+                artifact.discovered = false;
+                artifact.pulsePhase = Math.random() * Math.PI * 2;
+                
+                this.artifacts.push(artifact);
+            }
         }
 
         // Try to generate Master Artifact based on session progress
@@ -327,22 +489,21 @@ class CosmicCollectionStation {
         );
         
         if (masterArtifact) {
+            masterArtifact.discovered = false;
+            masterArtifact.pulsePhase = Math.random() * Math.PI * 2;
+            masterArtifact.isMaster = true; // Flag for special rendering
+            
             this.artifacts.push(masterArtifact);
             console.log(`🌟 Master Artifact available in field ${this.expedition.currentField}:`, masterArtifact.name);
             this.ui.showNotification(`🌟 Master Artifact detected in this field!`, 'legendary', 4000);
         }
         
-        // Auto-scan when entering new fields (quality of life improvement)
-        if (this.expedition.currentField > 1 && this.artifacts.length > 0) {
-            setTimeout(() => {
-                this.activateScanner();
-            }, 1000);
+        // Debug logging for development
+        if (this.artifacts.length > 0) {
+            console.log(`Artifacts spawned in field ${this.expedition.currentField}:`, 
+                this.artifacts.map(a => ({name: a.name, type: a.type, rarity: a.rarity}))
+            );
         }
-    }
-    
-    spawnArtifact() {
-        const artifact = this.resourceManager.generateArtifact(this.expedition.currentField);
-        this.artifacts.push(artifact);
     }
     
     loadDiscoveredArtifacts() {
@@ -356,10 +517,10 @@ class CosmicCollectionStation {
     updateShip() {
         if (this.gameState !== 'mining') return;
         
-        // Auto-mining: find nearest asteroid
+        // Auto-mining: find best asteroid with improved prioritization
         if (this.autoMining.enabled) {
-            let nearestAsteroid = null;
-            let nearestDistance = this.autoMining.searchRadius;
+            let bestAsteroid = null;
+            let bestScore = -1;
             
             this.asteroids.forEach(asteroid => {
                 const distance = Math.sqrt(
@@ -367,40 +528,65 @@ class CosmicCollectionStation {
                     (asteroid.y - this.ship.y) ** 2
                 );
                 
-                if (distance < nearestDistance) {
-                    nearestDistance = distance;
-                    nearestAsteroid = asteroid;
+                // Only consider asteroids within range
+                if (distance <= this.autoMining.searchRadius) {
+                    // Calculate priority score (higher is better)
+                    let score = 0;
+                    
+                    // Rare asteroids get priority bonus
+                    if (asteroid.type === 'rare') {
+                        score += 100;
+                    }
+                    
+                    // Closer asteroids get higher score (inverted distance)
+                    score += (this.autoMining.searchRadius - distance);
+                    
+                    // Higher resource count gets bonus
+                    score += asteroid.resources * 10;
+                    
+                    // Lower health asteroids get slight bonus (easier to finish)
+                    score += (asteroid.maxHealth - asteroid.health) * 5;
+                    
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestAsteroid = asteroid;
+                    }
                 }
             });
             
-            this.autoMining.target = nearestAsteroid;
+            this.autoMining.target = bestAsteroid;
             
             // Update target indicator
-            if (nearestAsteroid) {
+            if (bestAsteroid) {
                 this.autoMining.targetIndicator.visible = true;
-                this.autoMining.targetIndicator.x = nearestAsteroid.x;
-                this.autoMining.targetIndicator.y = nearestAsteroid.y;
+                this.autoMining.targetIndicator.x = bestAsteroid.x;
+                this.autoMining.targetIndicator.y = bestAsteroid.y;
                 
                 // Auto-rotate toward target with smooth interpolation
                 const targetAngle = Math.atan2(
-                    nearestAsteroid.y - this.ship.y, 
-                    nearestAsteroid.x - this.ship.x
+                    bestAsteroid.y - this.ship.y, 
+                    bestAsteroid.x - this.ship.x
                 );
                 
-                // Smooth rotation
+                // Smooth rotation with improved speed
                 let angleDiff = targetAngle - this.ship.angle;
                 while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
                 while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
-                this.ship.angle += angleDiff * 0.1; // Smooth rotation
+                this.ship.angle += angleDiff * 0.15; // Slightly faster rotation
                 
-                // Auto-mine if in range with improved range
-                const miningRange = 140; // Increased mining range
-                if (nearestDistance < miningRange && this.ship.fuel > 5) { // Reserve 5 fuel for return
+                // Auto-mine if in range with improved range calculation
+                const miningRange = 140 + (this.ship.maxCargo * 2); // Range scales with ship upgrades
+                const distance = Math.sqrt(
+                    (bestAsteroid.x - this.ship.x) ** 2 + 
+                    (bestAsteroid.y - this.ship.y) ** 2
+                );
+                
+                if (distance < miningRange && this.ship.fuel > 5) { // Reserve 5 fuel for return
                     this.laser.active = true;
                     this.laser.x = this.ship.x;
                     this.laser.y = this.ship.y;
-                    this.laser.targetX = nearestAsteroid.x;
-                    this.laser.targetY = nearestAsteroid.y;
+                    this.laser.targetX = bestAsteroid.x;
+                    this.laser.targetY = bestAsteroid.y;
                 } else {
                     this.laser.active = false;
                 }
@@ -732,16 +918,24 @@ class CosmicCollectionStation {
     }
     
     updateParticles() {
-        this.particles.forEach((particle, index) => {
+        // Use more efficient array operations to prevent memory buildup
+        for (let i = this.particles.length - 1; i >= 0; i--) {
+            const particle = this.particles[i];
             particle.x += particle.vx;
             particle.y += particle.vy;
             particle.life -= particle.decay;
-            particle.size *= 0.99;
             
-            if (particle.life <= 0 || particle.size < 0.1) {
-                this.particles.splice(index, 1);
+            if (particle.life <= 0) {
+                // Remove dead particles to prevent memory accumulation
+                this.particles.splice(i, 1);
             }
-        });
+        }
+        
+        // Enforce particle limit to prevent memory issues during intensive mining
+        const MAX_PARTICLES = 500;
+        if (this.particles.length > MAX_PARTICLES) {
+            this.particles.splice(0, this.particles.length - MAX_PARTICLES);
+        }
     }
     
     distanceToLineSegment(px, py, x1, y1, x2, y2) {
@@ -783,113 +977,65 @@ class CosmicCollectionStation {
     }
     
     dockAtStation() {
-        // Calculate storage capacity and bonuses from station
-        const storageInfo = this.stationManager.calculateStorageCapacity(this.station.grid);
-        
-        // Transfer cargo to station storage using ResourceManager
-        let resourceValue = this.resourceManager.processCargoAtStation(this.ship);
-        
-        // Apply factory resource multiplier if available
-        if (this.factory && this.factory.resourceMultiplier > 1) {
-            const factoryBonus = Math.floor(resourceValue * (this.factory.resourceMultiplier - 1));
-            resourceValue += factoryBonus;
-            this.ui.showNotification(`🏭 Factory processed ${factoryBonus} additional resources!`, 'success');
-        }
-        
-        // Apply garden bio-resource multiplier for biological materials
-        if (this.garden && this.garden.bioMultiplier > 1) {
-            const bioBonus = Math.floor(resourceValue * (this.garden.bioMultiplier - 1) * 0.3); // 30% of resources are biological
-            resourceValue += bioBonus;
-            if (bioBonus > 0) {
-                this.ui.showNotification(`🌿 Garden enhanced bio-materials: +${bioBonus} resources!`, 'success');
-            }
-        }
-        
-        // Apply station tier resource bonus
-        if (this.stationTierResourceBonus > 0) {
-            resourceValue += this.stationTierResourceBonus;
-            this.ui.showNotification(`🏗️ Station tier bonus: +${this.stationTierResourceBonus} resources!`, 'epic');
-        }
-        
-        // Apply Master Artifact bonuses if vault is built and we have artifacts
-        if (this.vault && this.masterArtifactBonus > 1) {
-            const masterBonus = Math.floor(resourceValue * (this.masterArtifactBonus - 1));
-            resourceValue += masterBonus;
-            if (masterBonus > 0) {
-                this.ui.showNotification(`🌌 Master Artifact resonance: +${masterBonus} resources!`, 'legendary');
-            }
-        }
-        
-        this.totalResources += resourceValue;
-        
-        // Full refuel with optional regeneration bonus
-        if (this.ship.fuelRegenRate && this.ship.fuelRegenRate > 0) {
-            const regenAmount = Math.floor(this.ship.maxFuel * this.ship.fuelRegenRate);
-            this.ship.fuel = Math.min(this.ship.maxFuel, this.ship.fuel + regenAmount);
-            if (regenAmount > 0) {
-                this.ui.showNotification(`🌱 Greenhouse regenerated ${regenAmount} fuel!`, 'success');
-            }
-        }
-        // Always ensure full refuel at station
-        this.ship.fuel = this.ship.maxFuel;
-        
-        // Reset expedition state for new expedition
-        this.expedition = {
-            currentField: 1,
-            maxFields: 5,
-            fieldsCleared: 0,
-            returnToStation: false
-        };
-        
-        // Reset session stats for new expedition
-        this.sessionStats = {
-            resourcesCollected: 0,
-            epicArtifactsFound: 0,
-            asteroidsMined: 0,
-            totalAsteroidsMined: this.sessionStats.totalAsteroidsMined || 0, // Preserve career total
-            miningEfficiency: 1.0
-        };
-        
-        // Check for storage warnings
-        if (storageInfo.capacity < this.totalResources) {
-            this.ui.showNotification(`⚠️ Storage at capacity! Consider building more Storage Bays.`, 'warning');
-        }
-        
-        // Switch to station view
-        this.gameState = 'station';
-        this.ui.switchToStationUI();
-        this.ui.showStationDocked(resourceValue);
-        this.stationManager.updateStationDisplay(this.totalResources, this.station);
-        
-        // Generate new field for next expedition
-        this.generateAsteroids();
-        
-        // Save progress
         try {
-            localStorage.setItem('totalResources', this.totalResources.toString());
-        } catch (e) {
-            console.warn('Failed to save resources:', e);
-        }
-        
-        // Log detailed station capabilities for debugging
-        console.log('Station docking complete:', {
-            resourcesGained: resourceValue,
-            totalResources: this.totalResources,
-            storageCapacity: storageInfo.capacity,
-            stationTier: this.station.tier,
-            expeditionReset: true,
-            fuelStatus: this.ship.fuel + '/' + this.ship.maxFuel,
-            capabilities: {
-                maxCargo: this.ship.maxCargo,
-                laserPower: this.laser.power,
-                maxFuel: this.ship.maxFuel,
-                fuelEfficiency: this.ship.fuelEfficiency,
-                factory: this.factory,
-                garden: this.garden,
-                reactor: this.reactor,
-                vault: this.vault
+            // Process cargo using ResourceManager with error handling
+            const resourceValue = this.resourceManager.processCargoAtStation(this.ship);
+            this.totalResources += resourceValue;
+            
+            // Reset expedition state
+            this.expedition.currentField = 1;
+            this.expedition.returnToStation = false;
+            
+            // Update player stats for Master Artifact tracking
+            this.resourceManager.updatePlayerStats({
+                fieldsVisited: this.resourceManager.playerStats.fieldsVisited + this.expedition.fieldsCleared
+            });
+            
+            // Save progress with error handling
+            try {
+                localStorage.setItem('totalResources', this.totalResources.toString());
+                this.resourceManager.savePlayerStats();
+                this.stationManager.saveStationGrid(this.station.grid);
+            } catch (saveError) {
+                console.warn('Failed to save game progress:', saveError);
+                this.ui.showNotification('⚠️ Save failed - progress may be lost on reload', 'warning', 5000);
             }
-        });
+            
+            // Refuel ship with station capacity
+            const fuelBonus = this.stationManager.calculateFuelCapacity(this.station.grid);
+            this.ship.fuel = fuelBonus;
+            this.ship.maxFuel = fuelBonus;
+            
+            // Reset session stats for next expedition
+            this.sessionStats = {
+                resourcesCollected: 0,
+                epicArtifactsFound: 0,
+                asteroidsMined: 0,
+                totalAsteroidsMined: this.sessionStats.totalAsteroidsMined, // Preserve career total
+                miningEfficiency: 1.0
+            };
+            
+            // Switch to station view and update UI
+            this.gameState = 'station';
+            this.stationManager.updateShipCapabilities(this);
+            this.stationManager.updateStationDisplay(this.totalResources, this.station);
+            this.ui.switchToStationUI();
+            
+            // Show docking confirmation with error handling
+            if (resourceValue > 0) {
+                this.ui.showStationDocked(resourceValue);
+            } else {
+                this.ui.showNotification('🏠 Docked at station - ready for next expedition!', 'info', 3000);
+            }
+            
+        } catch (error) {
+            console.error('Error during station docking:', error);
+            this.ui.showNotification('🚨 Docking error - some progress may be lost', 'error', 5000);
+            
+            // Fallback: ensure game state is still playable
+            this.gameState = 'station';
+            this.expedition.returnToStation = false;
+        }
     }
     
     // Use UIManager for all modal operations
