@@ -89,6 +89,15 @@ class CosmicCollectionStation {
             returnToStation: false
         };
         
+        // Session tracking for Master Artifact conditions
+        this.sessionStats = {
+            resourcesCollected: 0,
+            epicArtifactsFound: 0,
+            asteroidsMined: 0,
+            totalAsteroidsMined: 0,
+            miningEfficiency: 1.0
+        };
+        
         this.artifacts = []; // Discovered artifacts in current field
         this.discoveredArtifacts = this.resourceManager.loadDiscoveredArtifacts(); // Global collection
         
@@ -144,6 +153,22 @@ class CosmicCollectionStation {
             if (e.key.toLowerCase() === 'x' && this.gameState === 'mining') {
                 this.toggleAutoMining();
             }
+            
+            if (e.key.toLowerCase() === 'h') {
+                e.preventDefault();
+                this.showHelpSystem();
+            }
+            
+            if (e.key.toLowerCase() === 'p' && this.gameState === 'mining') {
+                e.preventDefault();
+                this.showMasterArtifactProgress();
+            }
+            
+            // Developer cheat system (for testing/demo purposes)
+            if (e.key === '`' || e.key === '~') {
+                e.preventDefault();
+                this.showCheatMenu();
+            }
         });
         
         window.addEventListener('keyup', (e) => {
@@ -184,6 +209,15 @@ class CosmicCollectionStation {
             // Starting a new expedition from station
             const launchCost = 8; // Reduced from 20, more accessible
             if (this.ship.fuel >= launchCost) {
+                // Reset session stats for new expedition
+                this.sessionStats = {
+                    resourcesCollected: 0,
+                    epicArtifactsFound: 0,
+                    asteroidsMined: 0,
+                    totalAsteroidsMined: this.sessionStats.totalAsteroidsMined || 0,
+                    miningEfficiency: 1.0
+                };
+                
                 this.expedition = {
                     currentField: 1,
                     maxFields: 5,
@@ -202,6 +236,11 @@ class CosmicCollectionStation {
                 // Show auto-mining indicator
                 if (this.autoMining.enabled) {
                     document.getElementById('autoMiningIndicator').style.display = 'block';
+                }
+                
+                // Show Master Artifact progress if not all collected
+                if (this.resourceManager.playerStats.masterArtifactsCollected.length < 5) {
+                    this.ui.showMasterArtifactProgress(this.resourceManager.getMasterArtifactProgress(this.sessionStats));
                 }
             } else {
                 this.ui.showInsufficientFuel(launchCost);
@@ -222,9 +261,35 @@ class CosmicCollectionStation {
         );
         this.artifacts = []; // Clear current field artifacts
         
-        // Generate artifacts using ResourceManager
+        // Track fields visited for Master Artifact conditions
+        this.resourceManager.updatePlayerStats({
+            fieldsVisited: this.resourceManager.playerStats.fieldsVisited + 1
+        });
+        
+        // Generate regular artifacts using ResourceManager
         if (this.resourceManager.shouldSpawnArtifact(this.expedition.currentField)) {
             this.spawnArtifact();
+        }
+
+        // Try to generate Master Artifact based on session progress
+        const masterArtifact = this.resourceManager.generateMasterArtifact(
+            this.expedition.currentField,
+            this.sessionStats,
+            this.canvas.width,
+            this.canvas.height
+        );
+        
+        if (masterArtifact) {
+            this.artifacts.push(masterArtifact);
+            console.log(`🌟 Master Artifact available in field ${this.expedition.currentField}:`, masterArtifact.name);
+            this.ui.showNotification(`🌟 Master Artifact detected in this field!`, 'legendary', 4000);
+        }
+        
+        // Auto-scan when entering new fields (quality of life improvement)
+        if (this.expedition.currentField > 1 && this.artifacts.length > 0) {
+            setTimeout(() => {
+                this.activateScanner();
+            }, 1000);
         }
     }
     
@@ -425,6 +490,18 @@ class CosmicCollectionStation {
     }
     
     destroyAsteroid(asteroid, index) {
+        // Track mining efficiency for Master Artifact conditions
+        this.sessionStats.asteroidsMined++;
+        this.sessionStats.totalAsteroidsMined++;
+        
+        // Improved mining efficiency calculation with better baseline
+        if (this.sessionStats.asteroidsMined > 0) {
+            // Calculate resources per asteroid ratio, with a minimum baseline
+            const baseEfficiency = Math.max(1, this.sessionStats.resourcesCollected / this.sessionStats.asteroidsMined);
+            // Normalize to 0-1 scale where 3+ resources per asteroid = 100% efficiency
+            this.sessionStats.miningEfficiency = Math.min(1.0, baseEfficiency / 3.0);
+        }
+        
         // Create explosion particles
         for (let i = 0; i < 20; i++) {
             this.particles.push({
@@ -462,39 +539,68 @@ class CosmicCollectionStation {
     }
     
     updateResources() {
+        // Track resources collected this session
+        const initialResourceCount = this.resources.length;
+        
         // Use ResourceManager for magnetism and collection
         this.resourceManager.updateResourceMagnetism(this.resources, this.ship);
         
-        // Collect nearby artifacts using ResourceManager
-        this.artifacts.forEach((artifact, index) => {
-            if (artifact.discovered) {
-                const distance = Math.sqrt(
-                    (artifact.x - this.ship.x) ** 2 + 
-                    (artifact.y - this.ship.y) ** 2
-                );
+        // Update session stats for resource collection
+        const resourcesCollected = initialResourceCount - this.resources.length;
+        if (resourcesCollected > 0) {
+            this.sessionStats.resourcesCollected += resourcesCollected;
+        }
+
+        // Handle artifact collection with Master Artifact support
+        const collectionResult = this.resourceManager.updateArtifactCollection(
+            this.artifacts, 
+            this.ship, 
+            this.discoveredArtifacts, 
+            this.totalResources
+        );
+
+        if (collectionResult.collected) {
+            this.totalResources += collectionResult.value;
+            
+            // Handle Master Artifact collection
+            if (collectionResult.masterArtifact) {
+                // Epic visual effect for Master Artifacts
+                this.createParticles(collectionResult.masterArtifact.x, collectionResult.masterArtifact.y, '#ffd700', 25);
                 
-                if (distance < 40) {
-                    // Add to global collection
-                    this.discoveredArtifacts.push({
-                        ...artifact,
-                        discoveredAt: Date.now()
-                    });
-                    this.resourceManager.saveDiscoveredArtifacts(this.discoveredArtifacts);
-                    
-                    // Add research value to resources
-                    this.totalResources += artifact.value;
-                    
-                    // Remove from current field
-                    this.artifacts.splice(index, 1);
-                    
-                    // Particle effect and notification
+                // Special notification for Master Artifacts
+                this.ui.showNotification(
+                    `🌟 MASTER ARTIFACT COLLECTED: ${collectionResult.masterArtifact.name}! (+${collectionResult.value} research)`, 
+                    'legendary', 
+                    6000
+                );
+
+                // Check for victory condition
+                if (collectionResult.victory) {
+                    this.handleVictory();
+                    return;
+                }
+
+                // Update Master Vault availability
+                this.stationManager.unlockModules(this.station, this.resourceManager);
+            } else {
+                // Handle regular artifacts
+                // Track epic artifacts for Master Artifact conditions
+                if (collectionResult.value >= 50) { // Epic artifacts have value 50+
+                    this.sessionStats.epicArtifactsFound++;
+                }
+
+                // Regular artifact notification
+                const artifact = this.artifacts.find(a => a.discovered);
+                if (artifact) {
                     this.createParticles(artifact.x, artifact.y, '#FFD700', 15);
-                    this.ui.showNotification(`✨ Collected ${artifact.rarity} artifact: ${artifact.name} (+${artifact.value} research)`, 'success', 4000);
-                    
-                    console.log(`Collected artifact: ${artifact.name} (+${artifact.value} research)`);
+                    this.ui.showNotification(
+                        `✨ Collected ${artifact.rarity} artifact: ${artifact.name} (+${collectionResult.value} research)`, 
+                        'success', 
+                        4000
+                    );
                 }
             }
-        });
+        }
     }
     
     createParticles(x, y, color, count) {
@@ -672,6 +778,127 @@ class CosmicCollectionStation {
         // Show notification about the change
         const status = this.autoMining.enabled ? 'enabled' : 'disabled';
         this.ui.showNotification(`🤖 Auto-mining ${status}`, 'info', 2000);
+    }
+    
+    // New method to handle victory condition
+    handleVictory() {
+        // Save final progress
+        localStorage.setItem('totalResources', this.totalResources.toString());
+        this.resourceManager.saveDiscoveredArtifacts(this.discoveredArtifacts);
+        
+        // Show victory screen
+        this.ui.showVictoryScreen();
+        
+        console.log('🎉 VICTORY! All 5 Master Artifacts collected!');
+    }
+    
+    // Help system
+    showHelpSystem() {
+        const helpContent = `🌟 COSMIC COLLECTION STATION - HELP 🌟
+
+🚀 CONTROLS:
+• WASD/Arrow Keys: Move ship
+• Space: Scanner pulse (reveals artifacts) | Continue through popups
+• X: Toggle auto-mining/manual mode
+• R: Return to station early
+• Tab: Switch between mining/station
+• H: Show this help
+• P: Show Master Artifact progress (while mining)
+• ~ (tilde): Developer cheats menu
+
+🎯 MASTER ARTIFACTS (Victory Goal):
+• 📚 Knowledge: Find 3+ epic artifacts in one expedition
+• 🌱 Growth: Collect 50+ resources in one expedition  
+• ⭐ Energy: Achieve 90%+ efficiency in Field 5
+• 🕰️ Time: Visit 20+ fields in your career
+• 🌌 Unity: Collect all other 4 Master Artifacts
+
+🏗️ STATION BUILDING:
+• Build Storage Bay for more cargo space
+• Build Research Lab to unlock advanced modules
+• Build Workshop for stronger mining laser
+• Build Observatory for better scanning
+• Build Master Vault when you have all 5 Master Artifacts
+
+💡 TIPS:
+• Deeper fields have better rewards but cost more fuel
+• Rare asteroids (pink) give more resources
+• Epic/Legendary artifacts are worth lots of research
+• Auto-mining is on by default - very convenient!
+• Session stats reset each expedition
+• Watch the top bar for real-time session progress
+• Auto-scan activates when entering artifact-rich fields
+
+🎮 QUALITY OF LIFE:
+• Press Space or Enter to continue through popups
+• Use Escape to cancel/go back in dialogs
+• Master Artifact progress shown at expedition start
+• Session stats displayed in expedition header
+• Help available anytime with H key`;
+
+        this.ui.showAlert('Help & Guide', helpContent);
+    }
+
+    // Show current Master Artifact progress
+    showMasterArtifactProgress() {
+        const progress = this.resourceManager.getMasterArtifactProgress(this.sessionStats);
+        this.ui.showMasterArtifactProgress(progress);
+    }
+    
+    // Simple cheat system for testing/demo
+    showCheatMenu() {
+        const cheatOptions = [
+            { text: 'Add 1000 Resources', action: () => this.addResources(1000) },
+            { text: 'Boost Session Stats', action: () => this.boostSessionStats() },
+            { text: 'Unlock Master Vault', action: () => this.unlockMasterVault() },
+            { text: 'Reset Progress', action: () => this.resetProgress() },
+            { text: 'Cancel', action: () => {} }
+        ];
+        
+        const cheatText = `🔧 DEVELOPER CHEATS 🔧\n\nFor testing and demonstration purposes.\nSelect an option:`;
+        
+        this.ui.showModal('Developer Cheats', cheatText, 
+            cheatOptions.map((option, index) => ({
+                text: option.text,
+                class: index === cheatOptions.length - 1 ? 'secondary' : 'primary',
+                value: index
+            }))
+        ).then(selectedIndex => {
+            if (selectedIndex >= 0 && selectedIndex < cheatOptions.length) {
+                cheatOptions[selectedIndex].action();
+            }
+        });
+    }
+    
+    addResources(amount) {
+        this.totalResources += amount;
+        localStorage.setItem('totalResources', this.totalResources.toString());
+        this.stationManager.updateStationDisplay(this.totalResources, this.station);
+        this.ui.showNotification(`🔧 Added ${amount} resources (cheat)`, 'info', 3000);
+    }
+    
+    boostSessionStats() {
+        this.sessionStats.resourcesCollected = 60;
+        this.sessionStats.epicArtifactsFound = 5;
+        this.sessionStats.miningEfficiency = 1.0;
+        this.resourceManager.updatePlayerStats({
+            fieldsVisited: this.resourceManager.playerStats.fieldsVisited + 25
+        });
+        this.ui.showNotification('🔧 Boosted session stats for Master Artifacts (cheat)', 'info', 3000);
+    }
+    
+    unlockMasterVault() {
+        // Simulate having all Master Artifacts
+        this.resourceManager.playerStats.masterArtifactsCollected = ['knowledge', 'growth', 'energy', 'time'];
+        this.resourceManager.savePlayerStats();
+        this.stationManager.unlockModules(this.station, this.resourceManager);
+        this.stationManager.updateStationDisplay(this.totalResources, this.station);
+        this.ui.showNotification('🔧 Unlocked Master Vault (cheat)', 'info', 3000);
+    }
+    
+    resetProgress() {
+        localStorage.clear();
+        this.ui.showNotification('🔧 Progress reset - reload page to restart', 'warning', 5000);
     }
 }
 

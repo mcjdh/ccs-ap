@@ -15,6 +15,8 @@ class UIManager {
             const buttonContainer = document.getElementById('modalButtons');
             buttonContainer.innerHTML = '';
             
+            let primaryButton = null;
+            
             buttons.forEach(button => {
                 const btn = document.createElement('button');
                 btn.className = `modal-button ${button.class || 'secondary'}`;
@@ -23,15 +25,58 @@ class UIManager {
                     this.hideModal();
                     resolve(button.value);
                 };
+                
+                // Track primary button for space key support
+                if (button.class === 'primary') {
+                    primaryButton = btn;
+                }
+                
                 buttonContainer.appendChild(btn);
             });
             
+            // Add keyboard support for space and enter keys
+            const keyHandler = (e) => {
+                if (e.key === ' ' || e.key === 'Enter') {
+                    e.preventDefault();
+                    if (primaryButton) {
+                        primaryButton.click();
+                    } else {
+                        // If no primary button, click the first button
+                        const firstButton = buttonContainer.querySelector('.modal-button');
+                        if (firstButton) firstButton.click();
+                    }
+                }
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    // Click secondary button or last button
+                    const secondaryButton = buttonContainer.querySelector('.modal-button.secondary');
+                    if (secondaryButton) {
+                        secondaryButton.click();
+                    }
+                }
+            };
+            
+            // Store the handler so we can remove it later
+            this.currentKeyHandler = keyHandler;
+            document.addEventListener('keydown', keyHandler);
+            
             document.getElementById('gameModal').style.display = 'flex';
+            
+            // Focus the primary button for better accessibility
+            if (primaryButton) {
+                setTimeout(() => primaryButton.focus(), 100);
+            }
         });
     }
 
     hideModal() {
         document.getElementById('gameModal').style.display = 'none';
+        
+        // Remove the keyboard event listener
+        if (this.currentKeyHandler) {
+            document.removeEventListener('keydown', this.currentKeyHandler);
+            this.currentKeyHandler = null;
+        }
     }
 
     showAlert(title, message) {
@@ -182,8 +227,11 @@ class UIManager {
             const fieldInfo = `Field ${game.expedition.currentField}/${game.expedition.maxFields}`;
             const asteroidInfo = `(${remaining} asteroids remaining)`;
             
+            // Add session stats for Master Artifact tracking
+            const sessionInfo = ` | Session: ${game.sessionStats.resourcesCollected}R ${game.sessionStats.epicArtifactsFound}E ${(game.sessionStats.miningEfficiency * 100).toFixed(0)}%Eff`;
+            
             document.getElementById('viewIndicator').textContent = 
-                `🚀 Expedition - ${fieldInfo} ${asteroidInfo}${fuelWarning}`;
+                `🚀 Expedition - ${fieldInfo} ${asteroidInfo}${sessionInfo}${fuelWarning}`;
         }
     }
 
@@ -301,5 +349,108 @@ class UIManager {
             // Welcome notification
             this.showNotification('🌟 Welcome to Cosmic Collection Station!', 'info', 4000);
         }, 3000);
+    }
+
+    // Victory screen for collecting all 5 Master Artifacts
+    showVictoryScreen() {
+        const victoryMessage = `🎉 COSMIC VICTORY! 🎉
+
+You have collected all 5 Master Artifacts and achieved the ultimate goal!
+
+🌌 Artifact of Unity
+📚 Artifact of Knowledge  
+🌱 Artifact of Growth
+⭐ Artifact of Energy
+🕰️ Artifact of Time
+
+Your Tier 5 Stellar Research Station is now complete, unlocking the secrets of the cosmos! The universe's greatest mysteries are now within your grasp.
+
+Congratulations, Space Pioneer! 🚀✨
+
+The cosmos await your next adventure...`;
+
+        // Create a special victory modal
+        const victoryModal = document.createElement('div');
+        victoryModal.innerHTML = `
+            <div class="modal" style="display: flex; background: rgba(0,0,0,0.9);">
+                <div class="modal-content" style="
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    border: 3px solid #ffd700;
+                    border-radius: 15px;
+                    text-align: center;
+                    padding: 30px;
+                    max-width: 600px;
+                    box-shadow: 0 0 50px rgba(255, 215, 0, 0.5);
+                ">
+                    <h2 style="color: #ffd700; font-size: 2.5em; margin-bottom: 20px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">
+                        🌟 COSMIC VICTORY! 🌟
+                    </h2>
+                    <div style="color: white; font-size: 1.1em; line-height: 1.6; white-space: pre-line; margin-bottom: 30px;">
+                        ${victoryMessage.split('\n').slice(2).join('\n')}
+                    </div>
+                    <button onclick="location.reload()" style="
+                        background: linear-gradient(45deg, #ffd700, #ffed4e);
+                        color: #333;
+                        border: none;
+                        padding: 15px 30px;
+                        font-size: 1.2em;
+                        font-weight: bold;
+                        border-radius: 25px;
+                        cursor: pointer;
+                        box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+                        transition: transform 0.2s;
+                    " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                        🚀 Start New Journey
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(victoryModal);
+        
+        // Trigger confetti effect with notifications
+        this.showNotification('🎊 ALL MASTER ARTIFACTS COLLECTED! 🎊', 'legendary', 8000);
+        setTimeout(() => {
+            this.showNotification('🌌 TIER 5 STELLAR RESEARCH STATION ACHIEVED! 🌌', 'legendary', 8000);
+        }, 2000);
+        
+        // Play victory sound effect if possible
+        try {
+            const audio = new Audio('data:audio/wav;base64,UklGRvIAAABXQVZFZm10IAAAAAABABAIAAAAAAAAAAAAAAAAAAAAAAAAAAAA');
+            audio.play().catch(() => {}); // Fail silently if audio doesn't work
+        } catch (e) {
+            // Audio not supported, continue silently
+        }
+    }
+
+    // Show Master Artifact progress for players
+    showMasterArtifactProgress(progress) {
+        const progressLines = [];
+        
+        Object.entries(progress).forEach(([key, data]) => {
+            if (!data.collected) {
+                let progressText;
+                if (key === 'energy') {
+                    progressText = `${data.description}: ${(data.current * 100).toFixed(1)}%/${(data.required * 100)}%`;
+                } else {
+                    progressText = `${data.description}: ${data.current}/${data.required}`;
+                }
+                
+                // Add progress indicator
+                const percentage = Math.min(100, (data.current / data.required) * 100);
+                const bars = Math.floor(percentage / 10);
+                const progressBar = '█'.repeat(bars) + '░'.repeat(10 - bars);
+                
+                progressLines.push(`${progressText} [${progressBar}]`);
+            }
+        });
+        
+        if (progressLines.length > 0) {
+            this.showNotification(
+                `🌟 Master Artifact Progress:\n${progressLines.join('\n')}`,
+                'info',
+                6000
+            );
+        }
     }
 } 

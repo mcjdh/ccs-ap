@@ -347,6 +347,14 @@ canvas {
     border-left-color: #f44336;
 }
 
+.notification-legendary {
+    border-left-color: #ffd700;
+    background: linear-gradient(135deg, rgba(255, 215, 0, 0.1), rgba(255, 237, 78, 0.1));
+    border: 2px solid #ffd700;
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+    animation: legendaryPulse 2s infinite;
+}
+
 .notification-content {
     flex: 1;
     line-height: 1.4;
@@ -520,5 +528,16 @@ canvas {
         min-width: 200px;
         max-width: 280px;
         font-size: 12px;
+    }
+}
+
+@keyframes legendaryPulse {
+    0%, 100% { 
+        box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+        transform: scale(1);
+    }
+    50% { 
+        box-shadow: 0 0 30px rgba(255, 215, 0, 0.6);
+        transform: scale(1.02);
     }
 } 

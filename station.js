@@ -9,7 +9,7 @@ class StationManager {
             greenhouse: { name: 'Greenhouse', icon: '🌱', cost: 30, unlocked: false, built: false },
             observatory: { name: 'Observatory', icon: '🔭', cost: 35, unlocked: false, built: false },
             quarters: { name: 'Guest Quarters', icon: '🛏️', cost: 45, unlocked: false, built: false },
-            vault: { name: 'Master Vault', icon: '💎', cost: 80, unlocked: false, built: false }
+            vault: { name: 'Master Vault', icon: '🌌', cost: 100, unlocked: false, built: false, description: 'Requires all 5 Master Artifacts' }
         };
     }
 
@@ -196,7 +196,7 @@ class StationManager {
         this.updateShipCapabilities(game);
         
         // Unlock new modules based on what was built
-        this.unlockModules(game.station);
+        this.unlockModules(game.station, game.resourceManager);
         
         // Update all displays
         this.createStationGrid(game.station.grid, game);
@@ -278,7 +278,7 @@ class StationManager {
         }
     }
 
-    unlockModules(station) {
+    unlockModules(station, resourceManager = null) {
         if (!this.modules) return;
         
         // Research Lab should always be unlocked if you have resources
@@ -300,9 +300,12 @@ class StationManager {
             this.modules.quarters.unlocked = true;
         }
         
-        // Unlock vault for final tier
-        if (station && station.tier >= 4) {
-            this.modules.vault.unlocked = true;
+        // Master Vault: Requires all 5 Master Artifacts
+        if (resourceManager) {
+            const masterStatus = resourceManager.getMasterArtifactStatus();
+            if (masterStatus.collected === 5) {
+                this.modules.vault.unlocked = true;
+            }
         }
     }
 

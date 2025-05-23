@@ -136,35 +136,98 @@ class Renderer {
         const pulse = Math.sin(artifact.pulsePhase) * 0.3 + 0.7;
         
         if (artifact.discovered) {
-            // Discovered artifacts glow brightly
-            this.ctx.fillStyle = `rgba(255, 215, 0, ${pulse})`;
-            this.ctx.beginPath();
-            this.ctx.arc(artifact.x, artifact.y, 20, 0, Math.PI * 2);
-            this.ctx.fill();
-            
-            // Artifact icon
-            this.ctx.fillStyle = '#FFD700';
-            this.ctx.font = '20px monospace';
-            this.ctx.textAlign = 'center';
-            this.ctx.fillText(artifact.icon, artifact.x, artifact.y + 7);
-            
-            // Rarity indicator
-            let rarityColor = '#ffffff';
-            if (artifact.rarity === 'legendary') rarityColor = '#ff6b9d';
-            else if (artifact.rarity === 'epic') rarityColor = '#9b59b6';
-            else if (artifact.rarity === 'rare') rarityColor = '#3498db';
-            else if (artifact.rarity === 'uncommon') rarityColor = '#2ecc71';
-            
-            this.ctx.strokeStyle = rarityColor;
-            this.ctx.lineWidth = 2;
-            this.ctx.beginPath();
-            this.ctx.arc(artifact.x, artifact.y, 15, 0, Math.PI * 2);
-            this.ctx.stroke();
+            // Special handling for Master Artifacts
+            if (artifact.isMaster) {
+                // Master Artifacts are much larger and more spectacular
+                const masterPulse = Math.sin(artifact.pulsePhase * 1.5) * 0.4 + 0.6;
+                
+                // Multiple layered golden glows
+                this.ctx.fillStyle = `rgba(255, 215, 0, ${masterPulse * 0.8})`;
+                this.ctx.beginPath();
+                this.ctx.arc(artifact.x, artifact.y, 40, 0, Math.PI * 2);
+                this.ctx.fill();
+                
+                this.ctx.fillStyle = `rgba(255, 215, 0, ${masterPulse * 0.6})`;
+                this.ctx.beginPath();
+                this.ctx.arc(artifact.x, artifact.y, 30, 0, Math.PI * 2);
+                this.ctx.fill();
+                
+                this.ctx.fillStyle = `rgba(255, 215, 0, ${masterPulse})`;
+                this.ctx.beginPath();
+                this.ctx.arc(artifact.x, artifact.y, 25, 0, Math.PI * 2);
+                this.ctx.fill();
+                
+                // Swirling outer ring
+                const time = Date.now() * 0.003;
+                for (let i = 0; i < 8; i++) {
+                    const angle = (time + i * Math.PI / 4) % (Math.PI * 2);
+                    const ringX = artifact.x + Math.cos(angle) * 35;
+                    const ringY = artifact.y + Math.sin(angle) * 35;
+                    
+                    this.ctx.fillStyle = `rgba(255, 215, 0, ${masterPulse * 0.7})`;
+                    this.ctx.beginPath();
+                    this.ctx.arc(ringX, ringY, 3, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+                
+                // Master Artifact icon (larger)
+                this.ctx.fillStyle = '#FFD700';
+                this.ctx.font = 'bold 32px monospace';
+                this.ctx.textAlign = 'center';
+                this.ctx.strokeStyle = '#000';
+                this.ctx.lineWidth = 2;
+                this.ctx.strokeText(artifact.icon, artifact.x, artifact.y + 12);
+                this.ctx.fillText(artifact.icon, artifact.x, artifact.y + 12);
+                
+                // Master rarity border (golden)
+                this.ctx.strokeStyle = '#FFD700';
+                this.ctx.lineWidth = 4;
+                this.ctx.beginPath();
+                this.ctx.arc(artifact.x, artifact.y, 20, 0, Math.PI * 2);
+                this.ctx.stroke();
+                
+                // Inner golden border
+                this.ctx.strokeStyle = '#FFED4E';
+                this.ctx.lineWidth = 2;
+                this.ctx.beginPath();
+                this.ctx.arc(artifact.x, artifact.y, 17, 0, Math.PI * 2);
+                this.ctx.stroke();
+                
+            } else {
+                // Regular discovered artifacts
+                this.ctx.fillStyle = `rgba(255, 215, 0, ${pulse})`;
+                this.ctx.beginPath();
+                this.ctx.arc(artifact.x, artifact.y, 20, 0, Math.PI * 2);
+                this.ctx.fill();
+                
+                // Regular artifact icon
+                this.ctx.fillStyle = '#FFD700';
+                this.ctx.font = '20px monospace';
+                this.ctx.textAlign = 'center';
+                this.ctx.fillText(artifact.icon, artifact.x, artifact.y + 7);
+                
+                // Regular rarity indicator
+                let rarityColor = '#ffffff';
+                if (artifact.rarity === 'legendary') rarityColor = '#ff6b9d';
+                else if (artifact.rarity === 'epic') rarityColor = '#9b59b6';
+                else if (artifact.rarity === 'rare') rarityColor = '#3498db';
+                else if (artifact.rarity === 'uncommon') rarityColor = '#2ecc71';
+                
+                this.ctx.strokeStyle = rarityColor;
+                this.ctx.lineWidth = 2;
+                this.ctx.beginPath();
+                this.ctx.arc(artifact.x, artifact.y, 15, 0, Math.PI * 2);
+                this.ctx.stroke();
+            }
         } else {
             // Hidden artifacts show faint energy signature
-            this.ctx.fillStyle = `rgba(100, 255, 100, ${pulse * 0.3})`;
+            // Master Artifacts have stronger signatures even when hidden
+            const hiddenPulse = artifact.isMaster ? pulse * 0.5 : pulse * 0.3;
+            const hiddenColor = artifact.isMaster ? 'rgba(255, 215, 0, ' : 'rgba(100, 255, 100, ';
+            
+            this.ctx.fillStyle = `${hiddenColor}${hiddenPulse})`;
             this.ctx.beginPath();
-            this.ctx.arc(artifact.x, artifact.y, 5, 0, Math.PI * 2);
+            this.ctx.arc(artifact.x, artifact.y, artifact.isMaster ? 8 : 5, 0, Math.PI * 2);
             this.ctx.fill();
         }
     }
