@@ -326,10 +326,24 @@ canvas {
 }
 
 .module-item.selected {
-    background: rgba(76, 175, 80, 0.15);
+    background: rgba(76, 175, 80, 0.25);
     border: 2px solid #4CAF50;
-    box-shadow: 0 0 20px rgba(76, 175, 80, 0.3);
+    box-shadow: 0 0 20px rgba(76, 175, 80, 0.4);
     transform: translateY(-2px);
+}
+
+.module-item.selected::after {
+    content: '✓ SELECTED';
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: #4CAF50;
+    color: #000;
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: bold;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 .module-item.unavailable {
@@ -452,8 +466,24 @@ canvas {
 
 .grid-cell.available {
     border-color: #4CAF50;
-    background: rgba(76, 175, 80, 0.15);
-    box-shadow: 0 0 15px rgba(76, 175, 80, 0.4);
+    background: rgba(76, 175, 80, 0.25);
+    box-shadow: 0 0 15px rgba(76, 175, 80, 0.5);
+    animation: buildPulse 2s infinite;
+}
+
+.grid-cell.available::before {
+    content: '+ BUILD';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 9px;
+    font-weight: bold;
+    color: #4CAF50;
+    background: rgba(0, 0, 0, 0.8);
+    padding: 3px 6px;
+    border-radius: 4px;
+    opacity: 0.8;
 }
 
 .grid-cell.built {
@@ -470,10 +500,10 @@ canvas {
 }
 
 .grid-cell:hover.available {
-    background: rgba(76, 175, 80, 0.3);
+    background: rgba(76, 175, 80, 0.4);
     border-color: #81C784;
     transform: scale(1.05);
-    box-shadow: 0 0 25px rgba(76, 175, 80, 0.6);
+    box-shadow: 0 0 25px rgba(76, 175, 80, 0.7);
 }
 
 .module-icon {
@@ -762,9 +792,19 @@ canvas {
 }
 
 @keyframes buildPulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.1); }
-    100% { transform: scale(1); }
+    0% { 
+        transform: scale(1); 
+        box-shadow: 0 0 20px rgba(76, 175, 80, 0.5);
+    }
+    50% { 
+        transform: scale(1.15); 
+        box-shadow: 0 0 30px rgba(76, 175, 80, 0.8);
+        border-color: #81C784;
+    }
+    100% { 
+        transform: scale(1); 
+        box-shadow: 0 0 20px rgba(76, 175, 80, 0.5);
+    }
 }
 
 @keyframes legendaryPulse {

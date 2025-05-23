@@ -4,6 +4,7 @@ class UIManager {
         this.modalCallback = null;
         this.notifications = [];
         this.notificationDuration = 3000; // 3 seconds
+        this.maxNotifications = 5; // Limit to 5 notifications at once
     }
 
     // Modal dialog system
@@ -92,8 +93,31 @@ class UIManager {
         ]);
     }
 
-    // Enhanced notification system
+    // Enhanced notification system with spam prevention
     showNotification(message, type = 'info', duration = null) {
+        // Prevent duplicate notifications by checking existing ones
+        const isDuplicate = this.notifications.some(n => 
+            n.message === message && n.type === type && (Date.now() - n.startTime) < 5000
+        );
+        
+        if (isDuplicate) {
+            return; // Don't show duplicate notifications within 5 seconds
+        }
+        
+        // Remove old notifications of the same type (especially for warnings)
+        if (type === 'warning' || type === 'error') {
+            this.removeNotificationsOfType(type);
+        }
+        
+        // Enforce maximum notification limit
+        if (this.notifications.length >= this.maxNotifications) {
+            // Remove the oldest notification
+            const oldestNotification = this.notifications[0];
+            if (oldestNotification) {
+                this.removeNotification(oldestNotification.id);
+            }
+        }
+        
         const notification = {
             id: Date.now(),
             message,
@@ -155,6 +179,18 @@ class UIManager {
         }
         
         this.notifications = this.notifications.filter(n => n.id !== id);
+    }
+
+    // Helper method to remove notifications of a specific type
+    removeNotificationsOfType(type) {
+        const toRemove = this.notifications.filter(n => n.type === type);
+        toRemove.forEach(n => this.removeNotification(n.id));
+    }
+
+    // Clear all notifications (useful for game state transitions)
+    clearAllNotifications() {
+        const toRemove = [...this.notifications]; // Copy array to avoid modification during iteration
+        toRemove.forEach(n => this.removeNotification(n.id));
     }
 
     // UI update methods
@@ -251,15 +287,25 @@ class UIManager {
     }
 
     updateFuelWarnings(ship) {
-        // This will be called from the main game loop for emergency warnings
-        if (ship.fuel <= 10 && !this.fuelWarningShown) {
-            this.fuelWarningShown = true;
-            this.showNotification('⚠️ FUEL CRITICAL! Return to station immediately!', 'warning', 5000);
-            
-            // Reset flag after a delay
-            setTimeout(() => {
-                this.fuelWarningShown = false;
-            }, 10000);
+        // Improved fuel warning system with better state tracking
+        const fuelPercentage = ship.fuel / ship.maxFuel;
+        
+        // Critical fuel warning (only once per expedition until fuel increases)
+        if (ship.fuel <= 5 && !this.criticalFuelWarningShown) {
+            this.criticalFuelWarningShown = true;
+            this.showNotification('🚨 FUEL CRITICAL! Return to station immediately!', 'error', 6000);
+        }
+        
+        // Low fuel warning (only once per expedition until fuel increases)
+        else if (ship.fuel <= 15 && ship.fuel > 5 && !this.lowFuelWarningShown) {
+            this.lowFuelWarningShown = true;
+            this.showNotification('⚠️ Low fuel! Press R to return to station', 'warning', 4000);
+        }
+        
+        // Reset warning flags if fuel goes back up (refueled or got fuel regen)
+        if (ship.fuel > 20) {
+            this.criticalFuelWarningShown = false;
+            this.lowFuelWarningShown = false;
         }
     }
 
@@ -285,6 +331,10 @@ class UIManager {
 
     // Game state UI switching
     switchToMiningUI() {
+        // Clear lingering notifications from previous state
+        this.removeNotificationsOfType('warning');
+        this.removeNotificationsOfType('error');
+        
         document.getElementById('miningUI').style.display = 'block';
         document.getElementById('miningControls').style.display = 'block';
         document.getElementById('stationUI').style.display = 'none';
@@ -301,6 +351,10 @@ class UIManager {
     }
 
     switchToStationUI() {
+        // Clear fuel warnings when returning to station
+        this.removeNotificationsOfType('warning');
+        this.removeNotificationsOfType('error');
+        
         document.getElementById('miningUI').style.display = 'none';
         document.getElementById('miningControls').style.display = 'none';
         document.getElementById('stationUI').style.display = 'block';
@@ -451,7 +505,7 @@ The cosmos await your next adventure...`;
     }
 
     // Show Master Artifact progress for players
-    showMasterArtifactProgress(progress) {
+    showMasterArtifactProgress(progress, tips = []) {
         const progressLines = [];
         
         Object.entries(progress).forEach(([key, data]) => {
@@ -472,12 +526,24 @@ The cosmos await your next adventure...`;
             }
         });
         
+        // Build the complete message
+        let message = '';
         if (progressLines.length > 0) {
-            this.showNotification(
-                `🌟 Master Artifact Progress:\n${progressLines.join('\n')}`,
-                'info',
-                6000
-            );
+            message += `🌟 Master Artifact Progress:\n${progressLines.join('\n')}`;
+        } else {
+            message += `🎉 All Master Artifacts collected! Victory achieved!`;
+        }
+        
+        // Add tips if provided
+        if (tips.length > 0) {
+            message += `\n\n${tips.join('\n')}`;
+        }
+        
+        // Show as notification or modal depending on length
+        if (message.length > 200) {
+            this.showAlert('Master Artifact Progress', message);
+        } else {
+            this.showNotification(message, 'info', 7000);
         }
     }
 } 

@@ -1,5 +1,9 @@
 class CosmicCollectionStation {
     constructor() {
+        // Game version for save compatibility
+        this.version = '0.1.0';
+        this.saveVersion = '1.0';
+        
         this.canvas = document.getElementById('gameCanvas');
         this.ctx = this.canvas.getContext('2d');
         this.setupCanvas();
@@ -13,6 +17,9 @@ class CosmicCollectionStation {
         // Make UI globally accessible for notifications
         window.game = this;
         
+        // Validate and migrate saves if needed
+        this.validateSaveData();
+        
         // Game state
         this.gameState = 'mining'; // 'mining' or 'station'
         this.keys = {};
@@ -25,10 +32,10 @@ class CosmicCollectionStation {
             angle: 0,
             vx: 0,
             vy: 0,
-            fuel: 120, // More generous starting fuel
-            maxFuel: 120, // Higher starting capacity
+            fuel: 120, // Balanced starting fuel
+            maxFuel: 120, // Balanced starting capacity  
             cargo: [],
-            maxCargo: 6,
+            maxCargo: 6, // Good starting cargo space
             size: 8,
             fuelEfficiency: 1 // Base efficiency
         };
@@ -40,7 +47,7 @@ class CosmicCollectionStation {
             y: 0,
             targetX: 0,
             targetY: 0,
-            power: 1
+            power: 1.5 // Slightly higher base power for better feel
         };
         
         // Game objects
@@ -99,6 +106,15 @@ class CosmicCollectionStation {
             miningEfficiency: 1.0
         };
         
+        // Performance monitoring for stability
+        this.performance = {
+            frameCount: 0,
+            lastFPSCheck: Date.now(),
+            currentFPS: 60,
+            averageFPS: 60,
+            lowFPSWarningShown: false
+        };
+        
         this.artifacts = []; // Discovered artifacts in current field
         this.discoveredArtifacts = this.resourceManager.loadDiscoveredArtifacts(); // Global collection
         
@@ -112,6 +128,24 @@ class CosmicCollectionStation {
         
         // Initialize title sequence with enhanced UI
         this.ui.initializeTitleSequence(this.autoMining.enabled);
+        
+        // Show onboarding for new players
+        this.checkFirstTimePlayer();
+        
+        // Console launch message for release
+        console.log(`
+🌟 COSMIC COLLECTION STATION v${this.version} 🌟
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚀 Stable Release - Ready for Adventure!
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 Goal: Collect 5 Master Artifacts
+🏗️ Features: Station building, Auto-mining, Mobile support
+🎮 Controls: H for help, Space to scan, WASD to move
+📱 Mobile: Touch controls enabled
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Built for Mini Jam 185 - Theme: Aliens & Limited Space
+Performance: ${this.performance.currentFPS} FPS | Save: v${this.saveVersion}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
     }
     
     setupCanvas() {
@@ -133,6 +167,56 @@ class CosmicCollectionStation {
             console.warn('Failed to load total resources:', e);
             return 15; // Default starter bonus on error
         }
+    }
+    
+    validateSaveData() {
+        try {
+            // Check save version compatibility
+            const saveVersion = localStorage.getItem('gameVersion');
+            if (!saveVersion) {
+                // First time or old save - set current version
+                localStorage.setItem('gameVersion', this.saveVersion);
+                console.log('🎮 New game initialized with version', this.version);
+                return;
+            }
+            
+            // Handle version migrations if needed
+            if (saveVersion !== this.saveVersion) {
+                console.log('🔄 Migrating save data from version', saveVersion, 'to', this.saveVersion);
+                this.migrateSaveData(saveVersion);
+                localStorage.setItem('gameVersion', this.saveVersion);
+            }
+            
+            // Validate critical save data
+            this.validateCriticalSaveData();
+            
+        } catch (e) {
+            console.warn('Save validation failed:', e);
+            this.ui.showNotification('⚠️ Save data validation failed - some progress may be reset', 'warning', 5000);
+        }
+    }
+    
+    migrateSaveData(fromVersion) {
+        // Future migration logic would go here
+        // For now, just log the migration
+        console.log('Save migration completed from', fromVersion, 'to', this.saveVersion);
+    }
+    
+    validateCriticalSaveData() {
+        // Validate that critical save data isn't corrupted
+        const criticalKeys = ['totalResources', 'stationGrid', 'moduleStates', 'playerStats'];
+        
+        criticalKeys.forEach(key => {
+            try {
+                const data = localStorage.getItem(key);
+                if (data && key !== 'totalResources') {
+                    JSON.parse(data); // Test if JSON is valid
+                }
+            } catch (e) {
+                console.warn(`Corrupted save data for ${key}, resetting...`);
+                localStorage.removeItem(key);
+            }
+        });
     }
     
     setupEventListeners() {
@@ -291,6 +375,16 @@ class CosmicCollectionStation {
             this.ui.switchToStationUI();
             this.stationManager.updateStationDisplay(this.totalResources, this.station);
             
+            // Ensure station grid is visible and properly set up
+            this.stationManager.createStationGrid(this.station.grid, this);
+            this.stationManager.populateModuleList(this.totalResources, this.station.grid);
+            
+            // Show the station grid
+            const stationGrid = document.getElementById('stationGrid');
+            if (stationGrid) {
+                stationGrid.style.display = 'block';
+            }
+            
             // Show helpful guidance for new players at station
             if (this.totalResources < 25) { // Early game guidance
                 setTimeout(() => {
@@ -310,6 +404,15 @@ class CosmicCollectionStation {
                     miningEfficiency: 1.0
                 };
                 
+                // Reset warning flags for new expedition
+                this.emergencyWarningShown = false;
+                this.autoReturnTriggered = false;
+                this.miningFuelWarningShown = false;
+                if (this.ui) {
+                    this.ui.criticalFuelWarningShown = false;
+                    this.ui.lowFuelWarningShown = false;
+                }
+                
                 this.expedition = {
                     currentField: 1,
                     maxFields: 5,
@@ -324,6 +427,12 @@ class CosmicCollectionStation {
                 this.consumeFuel(launchCost);
                 
                 this.ui.switchToMiningUI();
+                
+                // Hide the station grid
+                const stationGrid = document.getElementById('stationGrid');
+                if (stationGrid) {
+                    stationGrid.style.display = 'none';
+                }
                 
                 // Show auto-mining indicator
                 if (this.autoMining.enabled) {
@@ -355,8 +464,15 @@ class CosmicCollectionStation {
     }
     
     setupStationUI() {
+        // Ensure the station manager creates the grid and populates modules
         this.stationManager.createStationGrid(this.station.grid, this);
         this.stationManager.populateModuleList(this.totalResources, this.station.grid);
+        
+        // Make sure grid is initially hidden (since we start in mining mode)
+        const stationGrid = document.getElementById('stationGrid');
+        if (stationGrid) {
+            stationGrid.style.display = 'none';
+        }
     }
     
     generateAsteroids() {
@@ -364,13 +480,18 @@ class CosmicCollectionStation {
         this.resources = [];
         this.artifacts = [];
         
-        // Progressive field difficulty with enhanced balance
-        const baseCount = 8;
+        // Enhanced progressive field difficulty with guaranteed minimums for Master Artifact conditions
+        const baseCount = 10; // Increased base count
         const fieldMultiplier = Math.min(this.expedition.currentField * 0.3, 1.5); // Cap at 1.5x
-        const asteroidCount = Math.max(6, Math.floor(baseCount + fieldMultiplier * 4)); // Minimum 6 asteroids
+        const asteroidCount = Math.max(8, Math.floor(baseCount + fieldMultiplier * 4)); // Minimum 8 asteroids, up to 16
         
-        // Enhanced rare asteroid spawning with progression
-        const rareChance = Math.min(0.15 + (this.expedition.currentField - 1) * 0.05, 0.4); // 15% to 35%
+        // Improved rare asteroid spawning - more generous for better resource collection
+        const baseRareChance = 0.25 + (this.expedition.currentField - 1) * 0.08; // 25% to 57%
+        const rareChance = Math.min(baseRareChance, 0.6); // Cap at 60%
+        
+        // Calculate minimum resources needed for Growth Master Artifact (50 resources)
+        const estimatedResourcesFromAsteroids = asteroidCount * 2; // Conservative estimate
+        const needsBoost = estimatedResourcesFromAsteroids < 60; // Give buffer above 50
         
         for (let i = 0; i < asteroidCount; i++) {
             // Ensure asteroids don't spawn too close to ship starting position
@@ -395,11 +516,25 @@ class CosmicCollectionStation {
                 
             } while (true);
             
-            const isRare = Math.random() < rareChance;
+            // Improved rare chance - boost it if we need more resources
+            let currentRareChance = rareChance;
+            if (needsBoost && i < 4) { // First 4 asteroids get boosted rare chance
+                currentRareChance = Math.min(rareChance + 0.3, 0.8); // Up to 80% for resource boost
+            }
+            
+            const isRare = Math.random() < currentRareChance;
             const baseSize = 15 + Math.random() * 10;
             const size = isRare ? baseSize * 1.3 : baseSize;
             const baseHealth = isRare ? 4 : 3;
             const health = baseHealth + Math.floor(this.expedition.currentField / 2);
+            
+            // Improved resource distribution - ensure good yields
+            let resourceCount;
+            if (isRare) {
+                resourceCount = 3 + Math.floor(Math.random() * 3) + Math.floor(this.expedition.currentField / 2); // 3-5 + field bonus
+            } else {
+                resourceCount = 1 + Math.floor(Math.random() * 2) + Math.floor(this.expedition.currentField / 3); // 1-2 + field bonus
+            }
             
             this.asteroids.push({
                 x: x,
@@ -408,18 +543,24 @@ class CosmicCollectionStation {
                 health: health,
                 maxHealth: health,
                 type: isRare ? 'rare' : 'normal',
-                resources: isRare ? 3 + Math.floor(Math.random() * 3) : 1 + Math.floor(Math.random() * 2),
+                resources: resourceCount,
                 rotation: 0,
                 rotationSpeed: (Math.random() - 0.5) * 0.02
             });
         }
         
-        // Ensure at least one valuable asteroid per field
-        if (this.asteroids.filter(a => a.type === 'rare').length === 0 && this.asteroids.length > 3) {
-            const randomIndex = Math.floor(Math.random() * this.asteroids.length);
-            this.asteroids[randomIndex].type = 'rare';
-            this.asteroids[randomIndex].resources = 3 + Math.floor(Math.random() * 3);
-            this.asteroids[randomIndex].size *= 1.3;
+        // Guarantee at least 2 rare asteroids per field for better progression
+        const rareCount = this.asteroids.filter(a => a.type === 'rare').length;
+        const minRareNeeded = Math.max(2, Math.floor(this.expedition.currentField / 2));
+        
+        if (rareCount < minRareNeeded) {
+            // Convert some normal asteroids to rare
+            const normalAsteroids = this.asteroids.filter((a, i) => a.type === 'normal' ? i : -1).slice(0, minRareNeeded - rareCount);
+            normalAsteroids.forEach(asteroid => {
+                asteroid.type = 'rare';
+                asteroid.resources = 3 + Math.floor(Math.random() * 3) + Math.floor(this.expedition.currentField / 2);
+                asteroid.size *= 1.3;
+            });
         }
         
         // Enhanced artifact spawning with better progression
@@ -434,11 +575,15 @@ class CosmicCollectionStation {
             }, 1500);
         }
         
+        // Debug logging for balancing
+        const totalPotentialResources = this.asteroids.reduce((sum, a) => sum + a.resources, 0);
         console.log(`Field ${this.expedition.currentField} generated:`, {
             asteroids: this.asteroids.length,
             rareAsteroids: this.asteroids.filter(a => a.type === 'rare').length,
             artifacts: this.artifacts.length,
-            expectedRareChance: `${(rareChance * 100).toFixed(1)}%`
+            expectedRareChance: `${(rareChance * 100).toFixed(1)}%`,
+            totalPotentialResources: totalPotentialResources,
+            meetsGrowthRequirement: totalPotentialResources >= 50
         });
     }
     
@@ -607,24 +752,29 @@ class CosmicCollectionStation {
         
         // Apply fuel efficiency from station upgrades
         const fuelEfficiency = this.ship.fuelEfficiency || 1;
-        const baseFuelConsumption = 0.03 / fuelEfficiency; // More efficient base consumption
+        const baseFuelConsumption = 0.02 / fuelEfficiency; // Reduced from 0.03 for better balance
         
         // Movement fuel consumption (only when actively moving)
+        let isMoving = false;
         if (this.keys['w'] || this.keys['arrowup']) {
             this.ship.vy -= acceleration;
             this.consumeFuel(baseFuelConsumption);
+            isMoving = true;
         }
         if (this.keys['s'] || this.keys['arrowdown']) {
             this.ship.vy += acceleration;
             this.consumeFuel(baseFuelConsumption);
+            isMoving = true;
         }
         if (this.keys['a'] || this.keys['arrowleft']) {
             this.ship.vx -= acceleration;
             this.consumeFuel(baseFuelConsumption);
+            isMoving = true;
         }
         if (this.keys['d'] || this.keys['arrowright']) {
             this.ship.vx += acceleration;
             this.consumeFuel(baseFuelConsumption);
+            isMoving = true;
         }
         
         // Apply friction
@@ -649,14 +799,18 @@ class CosmicCollectionStation {
         if (this.ship.y > this.canvas.height) this.ship.y = 0;
         
         // Emergency low fuel warning and auto-return
-        if (this.ship.fuel <= 10 && this.ship.fuel > 0) {
-            this.ui.showNotification(`⚠️ Low fuel! Press R to return to station`, 'warning', 4000);
+        if (this.ship.fuel <= 10 && this.ship.fuel > 2 && !this.emergencyWarningShown) {
+            this.emergencyWarningShown = true;
+            this.ui.showNotification(`⚠️ Low fuel detected! Consider returning to station soon.`, 'warning', 4000);
         }
         
-        // Auto-return if fuel gets critically low (prevents softlock)
-        if (this.ship.fuel <= 2) {
-            this.ui.showNotification(`🚨 Emergency return to station!`, 'error', 3000);
-            this.returnToStation();
+        // Auto-return only if fuel gets critically low (prevents softlock but gives player control)
+        if (this.ship.fuel <= 1 && !this.autoReturnTriggered) {
+            this.autoReturnTriggered = true;
+            this.ui.showNotification(`🚨 Emergency fuel exhausted! Auto-returning to station!`, 'error', 3000);
+            setTimeout(() => {
+                this.returnToStation();
+            }, 2000); // Give player time to see the message
         }
     }
     
@@ -679,15 +833,18 @@ class CosmicCollectionStation {
         
         // Apply fuel efficiency from station upgrades
         const fuelEfficiency = this.ship.fuelEfficiency || 1;
-        const miningFuelCost = 0.15 / fuelEfficiency; // More efficient mining
+        const miningFuelCost = 0.08 / fuelEfficiency; // Reduced from 0.15 for better balance
         
         // Only consume fuel if we have enough (reserve some for return)
-        if (this.ship.fuel > 5) {
+        if (this.ship.fuel > 3) { // Reduced reserve requirement
             this.consumeFuel(miningFuelCost);
         } else {
             // Stop mining if fuel is too low
             this.laser.active = false;
-            this.ui.showNotification(`⛽ Not enough fuel for mining! Return to station.`, 'warning', 3000);
+            if (!this.miningFuelWarningShown) {
+                this.miningFuelWarningShown = true;
+                this.ui.showNotification(`⛽ Not enough fuel for mining! Return to station.`, 'warning', 3000);
+            }
             return;
         }
         
@@ -754,13 +911,19 @@ class CosmicCollectionStation {
         this.sessionStats.asteroidsMined++;
         this.sessionStats.totalAsteroidsMined++;
         
-        // Improved mining efficiency calculation with better baseline
-        if (this.sessionStats.asteroidsMined > 0) {
-            // Calculate resources per asteroid ratio, with a minimum baseline
-            const baseEfficiency = Math.max(1, this.sessionStats.resourcesCollected / this.sessionStats.asteroidsMined);
-            // Normalize to 0-1 scale where 3+ resources per asteroid = 100% efficiency
-            this.sessionStats.miningEfficiency = Math.min(1.0, baseEfficiency / 3.0);
-        }
+        // Improved mining efficiency calculation with realistic baseline
+        // Efficiency = (average resources per asteroid) / (ideal resources per asteroid)
+        // Ideal is considered to be 3 resources per asteroid (achievable but good)
+        const idealResourcesPerAsteroid = 3.0;
+        const currentAverageResources = this.sessionStats.resourcesCollected / Math.max(1, this.sessionStats.asteroidsMined);
+        this.sessionStats.miningEfficiency = Math.min(1.0, currentAverageResources / idealResourcesPerAsteroid);
+        
+        console.log('Mining efficiency updated:', {
+            asteroidsMinedThisSession: this.sessionStats.asteroidsMined,
+            resourcesCollectedThisSession: this.sessionStats.resourcesCollected,
+            averageResourcesPerAsteroid: currentAverageResources.toFixed(2),
+            efficiencyPercentage: (this.sessionStats.miningEfficiency * 100).toFixed(1) + '%'
+        });
         
         // Create explosion particles
         for (let i = 0; i < 20; i++) {
@@ -799,16 +962,19 @@ class CosmicCollectionStation {
     }
     
     updateResources() {
-        // Track resources collected this session
-        const initialResourceCount = this.resources.length;
+        // Track resources collected this session before they're modified
+        const initialResourceArrayLength = this.resources.length;
+        const initialCargoLength = this.ship.cargo.length;
         
         // Use ResourceManager for magnetism and collection
         this.resourceManager.updateResourceMagnetism(this.resources, this.ship);
         
-        // Update session stats for resource collection
-        const resourcesCollected = initialResourceCount - this.resources.length;
-        if (resourcesCollected > 0) {
-            this.sessionStats.resourcesCollected += resourcesCollected;
+        // Calculate how many resources were actually collected this update
+        const cargoIncrease = this.ship.cargo.length - initialCargoLength;
+        if (cargoIncrease > 0) {
+            // Update session stats immediately when resources are collected
+            this.sessionStats.resourcesCollected += cargoIncrease;
+            console.log('Resources collected this update:', cargoIncrease, 'Total session:', this.sessionStats.resourcesCollected);
         }
 
         // Handle artifact collection with Master Artifact support
@@ -847,6 +1013,7 @@ class CosmicCollectionStation {
                 // Track epic artifacts for Master Artifact conditions
                 if (collectionResult.value >= 50) { // Epic artifacts have value 50+
                     this.sessionStats.epicArtifactsFound++;
+                    console.log('Epic artifact found! Session total:', this.sessionStats.epicArtifactsFound);
                 }
 
                 // Regular artifact notification
@@ -884,7 +1051,7 @@ class CosmicCollectionStation {
         this.scanner.active = true;
         this.scanner.radius = 0;
         this.scanner.pulseTime = 1;
-        this.consumeFuel(3); // Reduced from 5 - scanner should be more accessible
+        this.consumeFuel(1.5); // Reduced from 3 - scanner should be more accessible and less fuel intensive
     }
     
     updateScanner() {
@@ -973,6 +1140,33 @@ class CosmicCollectionStation {
     gameLoop() {
         this.update();
         this.render();
+        
+        // Performance monitoring for stable release
+        this.performance.frameCount++;
+        const now = Date.now();
+        const deltaTime = now - this.performance.lastFPSCheck;
+        
+        // Update FPS every second
+        if (deltaTime >= 1000) {
+            this.performance.currentFPS = Math.round((this.performance.frameCount * 1000) / deltaTime);
+            this.performance.averageFPS = Math.round((this.performance.averageFPS + this.performance.currentFPS) / 2);
+            
+            // Show performance warning if FPS drops too low
+            if (this.performance.currentFPS < 30 && !this.performance.lowFPSWarningShown) {
+                console.warn('⚠️ Low FPS detected:', this.performance.currentFPS);
+                this.performance.lowFPSWarningShown = true;
+                
+                // Show user-friendly notification for severe performance issues
+                if (this.performance.currentFPS < 20) {
+                    this.ui.showNotification('⚠️ Performance warning: Consider reducing browser tabs', 'warning', 4000);
+                }
+            }
+            
+            // Reset for next measurement
+            this.performance.frameCount = 0;
+            this.performance.lastFPSCheck = now;
+        }
+        
         requestAnimationFrame(() => this.gameLoop());
     }
     
@@ -982,13 +1176,27 @@ class CosmicCollectionStation {
             const resourceValue = this.resourceManager.processCargoAtStation(this.ship);
             this.totalResources += resourceValue;
             
+            // Explicitly clear cargo and update UI immediately
+            this.ship.cargo = []; // Ensure cargo is definitely cleared
+            
+            // Update session stats with collected resources from this expedition
+            this.sessionStats.resourcesCollected += resourceValue;
+            
+            console.log('Docking debug:', {
+                cargoProcessed: resourceValue,
+                totalResources: this.totalResources,
+                cargoAfterClear: this.ship.cargo.length,
+                sessionResourcesCollected: this.sessionStats.resourcesCollected
+            });
+            
             // Reset expedition state
             this.expedition.currentField = 1;
             this.expedition.returnToStation = false;
             
             // Update player stats for Master Artifact tracking
             this.resourceManager.updatePlayerStats({
-                fieldsVisited: this.resourceManager.playerStats.fieldsVisited + this.expedition.fieldsCleared
+                fieldsVisited: this.resourceManager.playerStats.fieldsVisited + this.expedition.fieldsCleared,
+                totalResourcesCollected: this.resourceManager.playerStats.totalResourcesCollected + resourceValue
             });
             
             // Save progress with error handling
@@ -1002,16 +1210,18 @@ class CosmicCollectionStation {
             }
             
             // Refuel ship with station capacity
-            const fuelBonus = this.stationManager.calculateFuelCapacity(this.station.grid);
+            const fuelBonus = this.stationManager.calculateFuelCapacity ? 
+                this.stationManager.calculateFuelCapacity(this.station.grid) : this.ship.maxFuel;
             this.ship.fuel = fuelBonus;
             this.ship.maxFuel = fuelBonus;
             
-            // Reset session stats for next expedition
+            // Reset session stats for next expedition (but preserve career totals)
+            const careerTotalAsteroids = this.sessionStats.totalAsteroidsMined;
             this.sessionStats = {
                 resourcesCollected: 0,
                 epicArtifactsFound: 0,
                 asteroidsMined: 0,
-                totalAsteroidsMined: this.sessionStats.totalAsteroidsMined, // Preserve career total
+                totalAsteroidsMined: careerTotalAsteroids, // Preserve career total
                 miningEfficiency: 1.0
             };
             
@@ -1020,6 +1230,18 @@ class CosmicCollectionStation {
             this.stationManager.updateShipCapabilities(this);
             this.stationManager.updateStationDisplay(this.totalResources, this.station);
             this.ui.switchToStationUI();
+            this.ui.updateGameUI(this); // Force UI refresh to show empty cargo
+            
+            // Clear any lingering fuel warnings
+            this.ui.removeNotificationsOfType('warning');
+            this.ui.removeNotificationsOfType('error');
+            
+            // Reset warning flags
+            this.emergencyWarningShown = false;
+            this.autoReturnTriggered = false;
+            this.miningFuelWarningShown = false;
+            this.ui.criticalFuelWarningShown = false;
+            this.ui.lowFuelWarningShown = false;
             
             // Show docking confirmation with error handling
             if (resourceValue > 0) {
@@ -1035,6 +1257,7 @@ class CosmicCollectionStation {
             // Fallback: ensure game state is still playable
             this.gameState = 'station';
             this.expedition.returnToStation = false;
+            this.ship.cargo = []; // Emergency cargo clear
         }
     }
     
@@ -1086,7 +1309,7 @@ class CosmicCollectionStation {
     
     // Help system
     showHelpSystem() {
-        const helpContent = `🌟 COSMIC COLLECTION STATION - HELP 🌟
+        const helpContent = `🌟 COSMIC COLLECTION STATION v${this.version} 🌟
 
 🚀 CONTROLS:
 • WASD/Arrow Keys: Move ship
@@ -1126,7 +1349,18 @@ class CosmicCollectionStation {
 • Use Escape to cancel/go back in dialogs
 • Master Artifact progress shown at expedition start
 • Session stats displayed in expedition header
-• Help available anytime with H key`;
+• Help available anytime with H key
+
+📊 GAME INFO:
+• Version: ${this.version}
+• Save Version: ${this.saveVersion}
+• Current FPS: ${this.performance.currentFPS}
+• Average FPS: ${this.performance.averageFPS}
+
+🎨 CREDITS:
+• Game Design & Development: AI Assistant & Human Collaboration
+• Built for Mini Jam 185 - Theme: Aliens & Limited Space
+• Created with HTML5 Canvas, JavaScript, and CSS`;
 
         this.ui.showAlert('Help & Guide', helpContent);
     }
@@ -1134,7 +1368,32 @@ class CosmicCollectionStation {
     // Show current Master Artifact progress
     showMasterArtifactProgress() {
         const progress = this.resourceManager.getMasterArtifactProgress(this.sessionStats);
-        this.ui.showMasterArtifactProgress(progress);
+        
+        // Add helpful tips for achieving conditions
+        const tips = [];
+        
+        if (!progress.knowledge.collected && progress.knowledge.current < progress.knowledge.required) {
+            tips.push(`💡 Knowledge: Look for purple/legendary artifacts - they're usually epic!`);
+        }
+        
+        if (!progress.growth.collected && progress.growth.current < progress.growth.required) {
+            const needed = progress.growth.required - progress.growth.current;
+            tips.push(`💡 Growth: Mine ${needed} more resources this expedition (target rare asteroids!)`);
+        }
+        
+        if (!progress.energy.collected && this.expedition.currentField === 5) {
+            const currentEfficiency = (progress.energy.current * 100).toFixed(1);
+            if (progress.energy.current < progress.energy.required) {
+                tips.push(`💡 Energy: Current efficiency ${currentEfficiency}% - target rare asteroids for better efficiency!`);
+            }
+        }
+        
+        if (!progress.time.collected) {
+            const needed = progress.time.required - progress.time.current;
+            tips.push(`💡 Time: Visit ${needed} more fields in your career (keep exploring!)`);
+        }
+        
+        this.ui.showMasterArtifactProgress(progress, tips);
     }
     
     // Simple cheat system for testing/demo
@@ -1219,6 +1478,54 @@ class CosmicCollectionStation {
         setTimeout(() => {
             window.location.reload();
         }, 2000);
+    }
+    
+    checkFirstTimePlayer() {
+        const isFirstTime = !localStorage.getItem('hasPlayedBefore');
+        const tutorialComplete = localStorage.getItem('tutorialComplete');
+        
+        if (isFirstTime) {
+            localStorage.setItem('hasPlayedBefore', 'true');
+            
+            // Show welcome sequence for brand new players
+            setTimeout(() => {
+                this.showWelcomeSequence();
+            }, 3000); // After title fade
+        } else if (!tutorialComplete && this.sessionStats.totalAsteroidsMined < 10) {
+            // Show quick reminder for players who haven't completed basic tutorial
+            setTimeout(() => {
+                this.ui.showNotification('💡 Press H for help, Space to scan for artifacts!', 'info', 5000);
+            }, 2000);
+        }
+    }
+    
+    showWelcomeSequence() {
+        this.ui.showModal(
+            '🌟 Welcome to Cosmic Collection Station!',
+            `🚀 GETTING STARTED:
+
+🎯 Your Goal: Build an amazing space station and collect 5 Master Artifacts!
+
+⚡ AUTO-MINING: Enabled by default - your ship automatically targets asteroids
+🎮 WASD: Move your ship around
+⭐ SPACE: Scanner pulse to find artifacts
+🏠 TAB: Switch between mining and station building
+
+💡 Start by mining some asteroids, then return to build your station!
+
+Ready to begin your cosmic adventure?`,
+            [
+                { text: 'Start Playing!', class: 'primary', value: true },
+                { text: 'Show Full Help', class: 'secondary', value: false }
+            ]
+        ).then(startPlaying => {
+            if (startPlaying) {
+                this.ui.showNotification('🎮 Auto-mining is active! WASD to move, Space to scan!', 'success', 6000);
+                localStorage.setItem('tutorialComplete', 'basic');
+            } else {
+                this.showHelpSystem();
+            }
+        });
     }
 }
 

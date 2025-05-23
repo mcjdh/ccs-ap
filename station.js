@@ -355,13 +355,27 @@ class StationManager {
                             // Update ship capabilities with new tier
                             this.updateShipCapabilities(window.game);
                             
-                            // Refresh all displays
+                            // Immediately refresh all displays to show the upgrade
+                            this.createStationGrid(grid, window.game);
                             this.populateModuleList(window.game.totalResources, grid);
                             this.updateStationDisplay(window.game.totalResources, window.game.station);
-                            this.createStationGrid(grid, window.game);
                         }
                     } else {
+                        // For new builds, select the module
                         this.selectModule(key);
+                        
+                        // Update UI to show selection
+                        document.querySelectorAll('.module-item').forEach(i => i.classList.remove('selected'));
+                        item.classList.add('selected');
+                        
+                        // Show helpful instruction
+                        if (window.game && window.game.ui) {
+                            window.game.ui.showNotification(
+                                `✅ ${this.modules[key].name} selected! Click a green grid cell to build.`, 
+                                'info', 
+                                3000
+                            );
+                        }
                     }
                 });
             }
@@ -385,6 +399,12 @@ class StationManager {
     }
 
     selectModule(moduleKey) {
+        // Store selection in the game object for consistency
+        if (window.game && window.game.station) {
+            window.game.station.selectedModule = moduleKey;
+        }
+        
+        // Also store locally for fallback
         this.selectedModule = moduleKey;
         
         // Update visual selection
@@ -397,6 +417,8 @@ class StationManager {
         if (clickedItem) {
             clickedItem.classList.add('selected');
         }
+        
+        console.log('Module selected:', moduleKey);
     }
 
     canBuildAt(x, y, grid) {
@@ -450,9 +472,13 @@ class StationManager {
                         game.ui.showNotification('⚠️ Upgrade saved locally but may not persist', 'warning', 4000);
                     }
                     
-                    game.ui.showNotification(upgraded.message, 'success', 4000);
+                    // Immediately refresh the UI to show upgrade
+                    this.createStationGrid(game.station.grid, game);
+                    this.populateModuleList(game.totalResources, game.station.grid);
                     this.updateStationDisplay(game.totalResources, game.station);
                     this.updateShipCapabilities(game);
+                    
+                    game.ui.showNotification(upgraded.message, 'success', 4000);
                 } else {
                     game.ui.showNotification(upgraded.message, 'warning', 3000);
                 }
@@ -461,9 +487,16 @@ class StationManager {
             
             // Check if we have a module selected for building
             if (!game.station.selectedModule) {
+                console.warn('No module selected for building');
                 game.ui.showNotification('Select a module first, then click a green cell to build', 'info', 3000);
                 return;
             }
+            
+            console.log('Building attempt:', {
+                selectedModule: game.station.selectedModule,
+                position: posKey,
+                resources: game.totalResources
+            });
             
             // Validate the selected module exists
             const moduleType = game.station.selectedModule;
@@ -491,8 +524,9 @@ class StationManager {
             // Check resource cost
             const cost = moduleData.cost[moduleData.tier - 1] || moduleData.cost[0];
             if (game.totalResources < cost) {
+                const shortfall = cost - game.totalResources;
                 game.ui.showNotification(
-                    `Need ${cost} resources to build ${moduleData.name} (have ${game.totalResources})`, 
+                    `💎 Need ${cost} resources to build ${moduleData.name} (you have ${game.totalResources}, need ${shortfall} more)`, 
                     'warning', 
                     4000
                 );
@@ -510,6 +544,12 @@ class StationManager {
             
             // Clear selection
             game.station.selectedModule = null;
+            this.selectedModule = null; // Also clear local fallback
+            
+            // Clear visual selection from module list
+            document.querySelectorAll('.module-item').forEach(item => {
+                item.classList.remove('selected');
+            });
             
             // Save progress with error handling
             try {
@@ -525,6 +565,21 @@ class StationManager {
             this.updateStationDisplay(game.totalResources, game.station);
             this.updateShipCapabilities(game);
             this.unlockModules(game.station, game.resourceManager);
+            
+            // Immediately refresh the station grid and module list to show changes
+            this.createStationGrid(game.station.grid, game);
+            this.populateModuleList(game.totalResources, game.station.grid);
+            
+            // Add a satisfying build effect to the newly built cell
+            setTimeout(() => {
+                const builtCell = document.querySelector(`[data-pos="${posKey}"]`);
+                if (builtCell) {
+                    builtCell.style.animation = 'buildPulse 0.8s ease-out';
+                    setTimeout(() => {
+                        builtCell.style.animation = '';
+                    }, 800);
+                }
+            }, 100);
             
             // Success notification
             game.ui.showNotification(
@@ -547,6 +602,7 @@ class StationManager {
             
             // Reset selection to prevent stuck state
             game.station.selectedModule = null;
+            this.selectedModule = null; // Also clear local fallback
             this.updateStationDisplay(game.totalResources, game.station);
         }
     }
@@ -1072,5 +1128,23 @@ class StationManager {
         });
         
         return { capacity: baseCapacity, specialized: specializedStorage };
+    }
+    
+    calculateFuelCapacity(grid) {
+        let baseFuel = 120; // Starting fuel capacity
+        
+        Object.keys(grid).forEach(pos => {
+            const moduleType = grid[pos];
+            const module = this.modules[moduleType];
+            
+            if (moduleType === 'greenhouse' && module) {
+                const tier = module.tier || 1;
+                const efficiency = this.getModuleEfficiency(moduleType, pos, grid);
+                const fuelBonus = module.fuelBonus[tier - 1] || 20;
+                baseFuel += Math.floor(fuelBonus * efficiency);
+            }
+        });
+        
+        return Math.max(120, baseFuel); // Ensure minimum fuel capacity
     }
 } 
